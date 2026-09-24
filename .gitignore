@@ -1,0 +1,41 @@
+# Amazon competition data — NEVER commit
+data/raw
+data/processed/
+
+# Environments
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Heavy/generated model artifacts
+models/
+artifacts/
+*.pkl
+*.joblib
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Generated competition outputs may be huge
+output/*.tsv
+
+# Temporary/cache
+tmp/
+.cache/
+
+# Environment secrets / local paths
+.env
+.env.*
+
+# macOS
+.DS_Store

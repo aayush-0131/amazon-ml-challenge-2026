@@ -1,0 +1,125 @@
+Amazon ML Challenge 2026 — Quick Data Audit
+Python: 3.13.5
+Raw data root: /Users/aayushjha/Downloads/student_resource/dataset
+
+========================================================================
+data/raw/train/train_source1.tsv
+========================================================================
+file size        : 200.34 MB
+rows             : 2,206,821
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 0 (0.000%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S1': 2206821}
+countries:
+  'US'                1,323,633  (59.979%)
+  'India'               883,188  (40.021%)
+
+========================================================================
+data/raw/train/train_source2.tsv
+========================================================================
+file size        : 466.63 MB
+rows             : 5,034,616
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 168,967 (3.356%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S2': 5034616}
+countries:
+  'US'                3,016,817  (59.921%)
+  'India'             2,017,799  (40.079%)
+
+========================================================================
+data/raw/train/train_source3.tsv
+========================================================================
+file size        : 480.37 MB
+rows             : 5,285,603
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 175,916 (3.328%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S3': 5285603}
+countries:
+  'US'                3,170,056  (59.975%)
+  'India'             2,115,547  (40.025%)
+
+========================================================================
+data/raw/test/test_source1.tsv
+========================================================================
+file size        : 166.91 MB
+rows             : 1,732,544
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 0 (0.000%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S1': 1732544}
+countries:
+  'India'               809,986  (46.751%)
+  'US'                  663,106  (38.274%)
+  'France'              259,452  (14.975%)
+
+========================================================================
+data/raw/test/test_source2.tsv
+========================================================================
+file size        : 485.86 MB
+rows             : 4,887,273
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 129,408 (2.648%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S2': 4887273}
+countries:
+  'India'             2,312,565  (47.318%)
+  'US'                1,871,330  (38.290%)
+  'France'              703,378  (14.392%)
+
+========================================================================
+data/raw/test/test_source3.tsv
+========================================================================
+file size        : 482.56 MB
+rows             : 5,082,316
+schema OK        : True
+columns          : ['entity_id', 'business_name', 'business_address', 'country']
+missing name     : 0 (0.000%)
+missing address  : 136,098 (2.678%)
+missing country  : 0 (0.000%)
+ID prefixes      : {'S3': 5082316}
+countries:
+  'India'             2,405,000  (47.321%)
+  'US'                1,945,701  (38.284%)
+  'France'              731,615  (14.395%)
+
+========================================================================
+GROUND TRUTH
+========================================================================
+S1 ground-truth rows : 2,206,821
+total positive links : 7,638,365
+S2 positive links    : 3,693,619
+S3 positive links    : 3,944,746
+singletons           : 123,247 (5.585%)
+matched S1 entities  : 2,083,574 (94.415%)
+S1 with both S2 & S3 : 1,776,047 (80.480%)
+
+Match-count distribution:
+    0 matches :      123,247 (5.585%)
+    1 matches :      119,157 (5.399%)
+    2 matches :      375,212 (17.002%)
+    3 matches :      530,841 (24.055%)
+    4 matches :      484,115 (21.937%)
+    5 matches :      321,957 (14.589%)
+    6 matches :      164,868 (7.471%)
+    7 matches :       63,968 (2.899%)
+    8 matches :       18,680 (0.846%)
+    9 matches :        4,205 (0.191%)
+   10 matches :          534 (0.024%)
+   11 matches :           37 (0.002%)
+
+========================================================================
+QUICK AUDIT COMPLETE
+========================================================================
