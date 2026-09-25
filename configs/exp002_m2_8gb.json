@@ -1,0 +1,59 @@
+{
+  "subset_ids_path": "results/tables/exp001_subset_ids.csv",
+  "fit_tune_seed": 2029,
+  "tune_fraction_of_development": 0.25,
+  "model_seed": 2030,
+  "chunk_size": 200000,
+  "max_pool_per_source": 120,
+  "min_name_token_length": 3,
+  "min_address_token_length": 3,
+  "max_name_query_df": 60,
+  "max_address_query_df": 40,
+  "max_numeric_query_df": 250,
+  "max_char_query_df": 6,
+  "min_char_shared_ngrams": 2,
+  "min_char_jaccard": 0.2,
+  "blocker_budgets": [
+    {
+      "name": "compact",
+      "total_per_source": 40,
+      "exact_name": 10,
+      "exact_address": 10,
+      "name_signature": 10,
+      "name_token": 25,
+      "address_token": 15,
+      "numeric_address": 10,
+      "char_name": 10
+    },
+    {
+      "name": "balanced",
+      "total_per_source": 70,
+      "exact_name": 20,
+      "exact_address": 15,
+      "name_signature": 15,
+      "name_token": 45,
+      "address_token": 25,
+      "numeric_address": 15,
+      "char_name": 20
+    },
+    {
+      "name": "recall",
+      "total_per_source": 100,
+      "exact_name": 35,
+      "exact_address": 20,
+      "name_signature": 25,
+      "name_token": 70,
+      "address_token": 40,
+      "numeric_address": 25,
+      "char_name": 30
+    }
+  ],
+  "negative_sampling": {
+    "hard_negatives_per_entity": 20,
+    "easy_negatives_per_entity": 3,
+    "easy_hardness_ceiling": 55.0,
+    "seed": 2031
+  },
+  "rule_thresholds": [80, 84, 86, 88, 90, 92, 94, 96, 98, 99],
+  "probability_thresholds": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.93, 0.95, 0.97, 0.98, 0.99]
+}
