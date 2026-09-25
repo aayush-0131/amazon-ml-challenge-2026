@@ -6,11 +6,12 @@ Business Entity Resolution challenge.
 
 Current development branch:
 
-`feat/exp002c-fast-postings`
+`feat/exp002d-miss-analysis`
 
 Current production decision:
 
-**EXP002b rejected. EXP002c postings implementation ready for AWS 1k/5k verification; results pending.**
+**EXP002c: REVISE — architecture retained; recall gate not passed.
+EXP002d miss-analysis implementation ready for AWS execution; diagnostic results pending.**
 
 ---
 
@@ -88,12 +89,13 @@ No leaderboard submission yet.
 
 ## Immediate Work Queue
 
-1. EXP002c implementation: schema-2 country-scoped postings and persisted DF,
-   exact passes, bounded rare lists/common-token intersections, batched fetches,
-   explicit `configs/exp002c_postings.json`, query diagnostics and synthetic tests.
-2. On AWS, build the new indexes once, then benchmark 1k and 5k S1 using the
-   same persisted indexes. Commands/artifacts are in `experiments/EXP002.md`.
-3. Require high recall and practical runtime.
+1. Run `scripts/analyze_exp002c_misses.py` on AWS with the existing schema-2
+   indexes and exact EXP002c 5k hash sample (seed 2032).
+2. Review discovery versus cap/ranking misses, country/source slices, theoretical
+   DF recoverability and same-pool cap scenarios. Commands/artifacts are in
+   `experiments/EXP002.md`.
+3. Design the next retrieval revision from that evidence, requiring high recall
+   and practical runtime before model work.
 4. If retrieval passes, benchmark 20k.
 5. Train learned pair matcher using hard negatives.
 6. Tune using entity-level macro F0.5.
@@ -104,10 +106,17 @@ No leaderboard submission yet.
 9. Run official Amazon validator.
 10. Make leaderboard Submission #1.
 
-Only steps 1–3 are currently authorized. No EXP002c full-data runtime, peak RAM
-or recall is known. Schema-1 FTS indexes and prior measured results are retained;
-schema-2 builds use new filenames and atomic `.building.sqlite` publication.
-The revised benchmark refuses samples over 5k. It does not invoke training.
+Current authorized scope is miss-analysis implementation/tests/documentation
+and its AWS handoff. Do not rebuild indexes, run 20k, train or infer on TEST.
+EXP002c's AWS 5k final/pre-cap recall is 90.8991%/93.1191%, matched-all retention
+75.7512%, mean candidates 63.8378, query time 71.386 s and peak RSS approximately
+267 MB. Cap hits remain 60.29% per source query. The approximately 6.87-hour
+full-test query projection is not a measured full-test run.
+India's 89.5839% final / 89.9283% pre-cap recall primarily indicates discovery
+loss; US's 91.7945% / 95.2916% indicates more selection loss. S3 India is weakest
+(88.0576% / 88.4456%). EXP002d has no Amazon-data results yet.
+All prior evidence is retained. The diagnostic opens schema-2 indexes read-only;
+optional probe tracing changes neither index storage nor candidate selection.
 Required gate: >=96% positive-link recall (stretch 98%), materially improved
 matched all-links retention over EXP001's 68.416%, ideally <=80 candidates/S1,
 no near-universal cap saturation, and practical projected query runtime.

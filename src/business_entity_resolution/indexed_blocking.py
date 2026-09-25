@@ -112,6 +112,7 @@ class SourceSideIndex:
         self._country_counts = dict(self.connection.execute("SELECT country, n FROM country_counts"))
         self.last_diagnostics: Counter[str] = Counter()
         self._weights: dict[tuple[str, str], dict[str, float]] = {}
+        self.intersection_trace: dict | None = None
 
     def close(self) -> None:
         self.connection.close()
@@ -180,7 +181,10 @@ class SourceSideIndex:
         ranked = sorted(
             ((self._df(field, token, country), field, token) for field, token in set(terms)),
         )
-        ranked = [term for term in ranked if term[0] > 0][:self.config.intersection_terms]
+        ranked = [term for term in ranked if term[0] > 0]
+        if self.intersection_trace is not None:
+            self.intersection_trace["ranked_terms"] = ranked
+        ranked = ranked[:self.config.intersection_terms]
         count = 0
         for left, right in combinations(ranked, 2):
             if left[0] > self.config.intersection_anchor_df or count >= self.config.max_intersections:
@@ -197,6 +201,12 @@ class SourceSideIndex:
             ))
             self.last_diagnostics["intersection_queries"] += 1
             self.last_diagnostics["postings_looked_up"] += 2
+            if self.intersection_trace is not None:
+                self.intersection_trace["attempts"].append({
+                    "left": left, "right": right,
+                    "hits_bounded": len(rows),
+                    "overflow": len(rows) > self.config.max_intersection_hits,
+                })
             if len(rows) > self.config.max_intersection_hits:
                 self.last_diagnostics["intersection_overflows"] += 1
                 continue  # Reject an uninformative whole intersection, never an arbitrary prefix.
@@ -223,7 +233,7 @@ class SourceSideIndex:
             result.update((int(row["record_id"]), row) for row in rows)
         return result
 
-    def retrieve(self, query_record: SourceRecord) -> list[RetrievedCandidate]:
+    def retrieve(self, query_record: SourceRecord, *, trace: bool = False) -> list[RetrievedCandidate]:
         """Retrieve bounded candidates for one S1 record from this source index."""
 
         name = represent_name(query_record.business_name)
@@ -231,6 +241,9 @@ class SourceSideIndex:
         self.last_diagnostics = Counter()
         self._token_df.clear()
         self._weights.clear()
+        # Optional diagnostics observe the existing probes without issuing extra
+        # intersections or changing retrieval order/results. No schema change.
+        self.intersection_trace = {"ranked_terms": [], "attempts": []} if trace else None
         origins: dict[int, set[str]] = defaultdict(set)
 
         for record_id in self._exact_ids("exact_name", query_record.country, name.normalized):
