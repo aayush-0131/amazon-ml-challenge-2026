@@ -1,0 +1,27 @@
+Querying 1,000 S1 entities against reusable indexes ...
+ sample  positive_link_recall  average_candidates  query_seconds  peak_rss_mb
+s1_1000              0.935003               119.1      62.737083   251.886719
+	Command being timed: ".venv/bin/python -u scripts/benchmark_indexed_blocker.py --config configs/exp002f_compact_14.json --index-dir results/artifacts/exp002c_source_index --results-dir results/exp002f_compact_14_1k --sample-sizes 1000 --sample-seed 2032 --budget postings"
+	User time (seconds): 56.39
+	System time (seconds): 3.93
+	Percent of CPU this job got: 83%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:11.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 260572
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 147859
+	Voluntary context switches: 17313
+	Involuntary context switches: 346
+	Swaps: 0
+	File system inputs: 384160
+	File system outputs: 816
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+EXP002F_COMPACT_14_EXIT_CODE=0

@@ -1,0 +1,73 @@
+{
+  "config": {
+    "subset_ids_path": "results/tables/exp001_subset_ids.csv",
+    "index_chunk_size": 10000,
+    "source_index": {
+      "max_exact_hits": 250,
+      "name_query_terms": 4,
+      "address_query_terms": 4,
+      "numeric_query_terms": 3,
+      "max_name_token_df": 60,
+      "max_address_token_df": 40,
+      "max_numeric_token_df": 250,
+      "min_name_token_length": 3,
+      "min_address_token_length": 3,
+      "intersection_anchor_df": 5000,
+      "intersection_terms": 16,
+      "max_intersections": 18,
+      "max_intersection_hits": 150,
+      "record_batch_size": 400,
+      "intersection_scheduler": "selective_v2_compact",
+      "selective_max_anchor_df": 50000,
+      "selective_max_expected_hits": 150,
+      "selective_max_probes_per_term": 6,
+      "compact_unique_candidate_budget": 250
+    },
+    "blocker_budgets": [
+      {
+        "name": "postings",
+        "total_per_source": 60,
+        "exact_name": 40,
+        "exact_address": 40,
+        "name_signature": 40,
+        "name_token": 40,
+        "address_token": 40,
+        "numeric_address": 40,
+        "char_name": 0
+      }
+    ]
+  },
+  "config_sha256": "34e8daff83b05721bbf16c4ed8b1fb04fa96c7d41482cfcf91c3fcf8f6539cb7",
+  "git_commit": "4331ce031111bf711f07f8ab773b20307abae347",
+  "schema_version": 2,
+  "sample_sizes": [
+    1000
+  ],
+  "sample_seed": 2032,
+  "budget": "postings",
+  "index_dir": "/home/ubuntu/amazon-ml-challenge-2026/results/artifacts/exp002c_source_index",
+  "build_only": false,
+  "experiment": "exp002f",
+  "resolved_source_config": {
+    "max_exact_hits": 250,
+    "name_query_terms": 4,
+    "address_query_terms": 4,
+    "numeric_query_terms": 3,
+    "max_name_token_df": 60,
+    "max_address_token_df": 40,
+    "max_numeric_token_df": 250,
+    "min_name_token_length": 3,
+    "min_address_token_length": 3,
+    "intersection_anchor_df": 5000,
+    "intersection_terms": 16,
+    "max_intersections": 18,
+    "max_intersection_hits": 150,
+    "record_batch_size": 400,
+    "intersection_scheduler": "selective_v2_compact",
+    "selective_max_anchor_df": 50000,
+    "selective_max_expected_hits": 150,
+    "selective_max_probes_per_term": 6,
+    "compact_unique_candidate_budget": 250
+  },
+  "intersection_scheduler": "selective_v2_compact"
+}
