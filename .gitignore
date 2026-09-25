@@ -18,6 +18,7 @@ __pycache__/
 # Heavy/generated model artifacts
 models/
 artifacts/
+results/artifacts/
 *.pkl
 *.joblib
 *.bin

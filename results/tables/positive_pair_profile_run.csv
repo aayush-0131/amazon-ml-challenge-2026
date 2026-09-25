@@ -1,0 +1,2 @@
+sample_size,seed,runtime_seconds,peak_rss_mb
+100000,2026,35.13436970897601,372.734375

@@ -72,3 +72,26 @@ Run all unit tests:
 ```bash
 .venv/bin/python -m pytest -q
 ```
+
+## EXP001 lexical baseline
+
+Profile a deterministic 100,000-link sample of training positives:
+
+```bash
+.venv/bin/python scripts/profile_positive_pairs.py \
+  --sample-size 100000 \
+  --seed 2026
+```
+
+Run the memory-constrained M2/8 GB experiment configuration (20,000 S1 entities):
+
+```bash
+.venv/bin/python scripts/run_exp001.py \
+  --config configs/exp001_m2_8gb.json
+```
+
+The default `configs/exp001.json` requests 100,000 S1 entities for machines with
+more headroom. Both configurations use entity-level sampling only. Candidate rows
+and validation predictions are derived training artifacts under `results/artifacts/`
+and are intentionally ignored by Git; aggregate metrics and the exact subset IDs are
+saved under `results/tables/`.

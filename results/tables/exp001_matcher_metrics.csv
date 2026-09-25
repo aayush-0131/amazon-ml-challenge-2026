@@ -1,0 +1,2 @@
+threshold,n_entities,beta,macro_precision,macro_recall,macro_fbeta,micro_precision,micro_recall,micro_fbeta,true_positives,false_positives,false_negatives,singleton_count,correct_singletons,false_positive_singletons,singleton_accuracy,average_predicted_matches
+96.0,12000,0.5,0.7199336833961869,0.49625393518518596,0.627204453747955,0.6438718308064721,0.4860309674937488,0.604602335263435,20215,11181,21377,670,462,208,0.6895522388059702,2.6163333333333334

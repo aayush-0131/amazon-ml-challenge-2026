@@ -18,7 +18,9 @@ class EntitySplit:
     validation_ids: frozenset[str]
 
 
-def _stable_key(entity_id: str, seed: int) -> bytes:
+def stable_entity_key(entity_id: str, seed: int) -> bytes:
+    """Return a process- and platform-stable pseudorandom entity key."""
+
     payload = f"{seed}\0{entity_id}".encode("utf-8")
     return hashlib.blake2b(payload, digest_size=16).digest()
 
@@ -75,7 +77,7 @@ def stratified_entity_split(
     validation: set[str] = set()
     for entity_ids in strata.values():
         ordered = sorted(
-            entity_ids, key=lambda value: (_stable_key(value, seed), value)
+            entity_ids, key=lambda value: (stable_entity_key(value, seed), value)
         )
         validation_size = round(len(ordered) * validation_fraction)
         if len(ordered) >= 2:

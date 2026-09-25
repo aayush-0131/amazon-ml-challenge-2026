@@ -1,0 +1,11 @@
+{
+  "subset_size": 100000,
+  "subset_seed": 2026,
+  "evaluation_fraction": 0.6,
+  "partition_seed": 2027,
+  "chunk_size": 200000,
+  "top_k_per_source": 25,
+  "min_informative_token_length": 4,
+  "max_query_token_frequency": 25,
+  "thresholds": [50, 55, 60, 65, 70, 75, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98]
+}

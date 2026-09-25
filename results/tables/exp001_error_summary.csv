@@ -1,0 +1,11 @@
+error_category,count
+entities_with_false_negatives,9733
+entities_with_false_positives,3429
+false_negative_below_threshold_links,15677
+false_negative_blocking_miss_links,5700
+false_negative_links,21377
+false_negative_s2_links,9404
+false_negative_s3_links,11973
+false_positive_links,11181
+false_positive_matched_entity_links,10479
+false_positive_singleton_links,702
