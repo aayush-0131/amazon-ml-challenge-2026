@@ -1,0 +1,7 @@
+split,source,relative_path,file_size_bytes,row_count,schema_valid,entity_id_prefix_valid
+train,S1,data/raw/train/train_source1.tsv,210069713,2206821,True,True
+train,S2,data/raw/train/train_source2.tsv,489301488,5034616,True,True
+train,S3,data/raw/train/train_source3.tsv,503705637,5285603,True,True
+test,S1,data/raw/test/test_source1.tsv,175022086,1732544,True,True
+test,S2,data/raw/test/test_source2.tsv,509456422,4887273,True,True
+test,S3,data/raw/test/test_source3.tsv,506002772,5082316,True,True

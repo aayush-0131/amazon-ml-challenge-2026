@@ -1,0 +1,2 @@
+relative_path,row_count,distinct_source1_entity_ids,duplicate_source1_rows
+data/raw/train/train_ground_truth.tsv,2206821,2206821,0
