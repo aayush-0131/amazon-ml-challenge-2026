@@ -6,12 +6,13 @@ Business Entity Resolution challenge.
 
 Current development branch:
 
-`feat/exp002d-miss-analysis`
+`feat/exp002e-selective-intersections`
 
 Current production decision:
 
 **EXP002c: REVISE — architecture retained; recall gate not passed.
-EXP002d miss-analysis implementation ready for AWS execution; diagnostic results pending.**
+EXP002d AWS miss analysis complete. EXP002e selective intersections implemented;
+ready for AWS 1k comparison only, with no EXP002e recall/runtime measured yet.**
 
 ---
 
@@ -89,34 +90,47 @@ No leaderboard submission yet.
 
 ## Immediate Work Queue
 
-1. Run `scripts/analyze_exp002c_misses.py` on AWS with the existing schema-2
-   indexes and exact EXP002c 5k hash sample (seed 2032).
-2. Review discovery versus cap/ranking misses, country/source slices, theoretical
-   DF recoverability and same-pool cap scenarios. Commands/artifacts are in
-   `experiments/EXP002.md`.
-3. Design the next retrieval revision from that evidence, requiring high recall
-   and practical runtime before model work.
-4. If retrieval passes, benchmark 20k.
-5. Train learned pair matcher using hard negatives.
-6. Tune using entity-level macro F0.5.
-7. Run full TEST inference on AWS.
-8. Generate:
-   - matching_results.tsv
-   - candidate_pairs.tsv
-9. Run official Amazon validator.
-10. Make leaderboard Submission #1.
+1. Run AWS 1k for EXP002e intersection-only, moderate and balanced variants,
+   reusing completed schema-2 indexes. Exact commands: `experiments/EXP002.md`.
+2. Review final/pre-cap recall, India/S3 India, all-links retention, candidate
+   counts, intersection probes/overflow, CPU time and RAM across all variants.
+3. Run 5k only for variants explicitly authorized after that review, using
+   `--reviewed-1k` and a fresh output directory. Do not automatically run 20k.
+4. Require the recall/runtime gate before separately authorizing larger runs
+   or learned-matcher work. EXP001 remains the best validated matcher.
 
-Current authorized scope is miss-analysis implementation/tests/documentation
-and its AWS handoff. Do not rebuild indexes, run 20k, train or infer on TEST.
+Current authorized Codex scope is code/config/tests/documentation and AWS
+handoff only. Do not rebuild indexes, run Amazon benchmarks, train or infer
+on TEST. EXP002e keeps schema 2 and the historical EXP002c config unchanged.
+The new scheduler is opt-in (`selective_v1`); legacy is the default.
 EXP002c's AWS 5k final/pre-cap recall is 90.8991%/93.1191%, matched-all retention
 75.7512%, mean candidates 63.8378, query time 71.386 s and peak RSS approximately
 267 MB. Cap hits remain 60.29% per source query. The approximately 6.87-hour
 full-test query projection is not a measured full-test run.
 India's 89.5839% final / 89.9283% pre-cap recall primarily indicates discovery
 loss; US's 91.7945% / 95.2916% indicates more selection loss. S3 India is weakest
-(88.0576% / 88.4456%). EXP002d has no Amazon-data results yet.
-All prior evidence is retained. The diagnostic opens schema-2 indexes read-only;
-optional probe tracing changes neither index storage nor candidate selection.
+(88.0576% / 88.4456%).
+
+EXP002d evidence (`c5236f9`, same 5k/seed 2032/17,207 links) identifies 1,184
+discovery misses and 382 cap misses. Overlapping intersection reasons include
+706 omitted terms, 525 anchors above the DF bound, 609 pair-budget omissions,
+8 overflows, 81 without usable combinations and zero unresolved. Even the
+aggressive single-token DF union leaves 680 discovery misses: 399 omitted terms,
+386 anchor failures, 196 pair-budget omissions, 6 overflows, 53 without a usable
+combination, zero unresolved; only 2 have no shared lexical/numeric token.
+Moderate/balanced/aggressive DF unions theoretically recover 202/332/504 misses;
+they are not measured production retrieval results or runtime guarantees.
+Total-only cap 60 gives historical-pool recall 92.6077%, mean 79.6254 candidates
+and matched-all 79.8138%. EXP002e therefore keeps active pass limits at 40 and
+sets only total_per_source to 60.
+
+EXP002e considers up to 16 terms / 120 Python pairs, issues at most 24 SQL
+probes with at most 6 per term, and permits anchors up to DF 50,000 only with
+the documented selectivity gate above DF 5,000. Overflow remains whole-pair
+rejection at >150 hits. These bounds still need AWS runtime validation.
+All prior evidence is retained. Full synthetic suite: **64 passed**. Tests
+verify legacy candidate equivalence, bounded/diverse scheduling, Unicode
+numeric terms, read-only schema-2 reuse, overflow rejection and no target scan.
 Required gate: >=96% positive-link recall (stretch 98%), materially improved
 matched all-links retention over EXP001's 68.416%, ideally <=80 candidates/S1,
 no near-universal cap saturation, and practical projected query runtime.

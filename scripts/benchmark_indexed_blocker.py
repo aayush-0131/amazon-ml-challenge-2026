@@ -16,6 +16,7 @@ import resource
 import sys
 import subprocess
 import time
+from dataclasses import asdict
 from collections import defaultdict
 from pathlib import Path
 
@@ -29,6 +30,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from business_entity_resolution.indexed_blocking import (  # noqa: E402
     INDEX_SCHEMA_VERSION,
+    IndexBuildResult,
     SourceIndexConfig,
     SourceSideIndex,
     _index_path,
@@ -163,6 +165,7 @@ def run_benchmark(
             diagnostic = {
                 "sample": sample_name, "source1_entity_id": entity_id,
                 "source": source, "country": record.country,
+                "intersection_scheduler": index.config.intersection_scheduler,
                 **dict(index.last_diagnostics),
                 "eligible_before_final_cap": len(eligible),
                 "cap_hit": int(len(candidates) == budget.total_per_source),
@@ -195,18 +198,23 @@ def run_benchmark(
         row["projected_1732544_s1_query_hours"] = row["average_query_seconds_per_s1"] * 1_732_544 / 3600
         row["recall_before_cap"] = sum(d["true_links_before_cap"] for d in scope) / row["true_link_count"] if row["true_link_count"] else 1.0
         row["source_query_count"] = len(scope)
+        row["intersection_scheduler"] = scope[0]["intersection_scheduler"]
+        row["average_intersection_probes_per_source_query"] = sum(d.get("intersection_queries", 0) for d in scope) / len(scope)
+        row["p95_intersection_probes_per_source_query"] = float(np.quantile([d.get("intersection_queries", 0) for d in scope], .95))
+        row["intersection_sql_seconds"] = sum(d.get("intersection_sql_seconds", 0.0) for d in scope)
+        row["intersection_total_seconds"] = sum(d.get("intersection_total_seconds", 0.0) for d in scope)
         row["cap_hit_rate_per_source_query"] = sum(d["cap_hit"] for d in scope) / len(scope)
         row["cap_truncated_rate_per_source_query"] = sum(d["cap_truncated"] for d in scope) / len(scope)
-        for key in ("exact_candidates", "token_candidates", "token_only_candidates", "selected_exact_candidates", "candidates_before_cap", "postings_looked_up", "posting_ids_returned", "intersection_queries", "intersection_overflows", "exact_overflow_passes"):
+        for key in ("exact_candidates", "token_candidates", "token_only_candidates", "selected_exact_candidates", "candidates_before_cap", "postings_looked_up", "posting_ids_returned", "intersection_queries", "intersection_overflows", "exact_overflow_passes", "intersection_pairs_considered", "intersection_pairs_skipped_rules", "intersection_pairs_skipped_anchor", "intersection_pairs_skipped_selectivity", "intersection_pairs_skipped_term_quota", "intersection_nonempty_successes", "intersection_unique_candidate_ids"):
             row[f"average_{key}_per_s1"] = sum(d.get(key, 0) for d in scope) / row["entity_count"]
     if diagnostics_out is not None:
         diagnostics_out.extend(diagnostic_rows)
     return metrics
 
 
-def write_report(path: Path, build: pd.DataFrame, metrics: pd.DataFrame) -> None:
+def write_report(path: Path, build: pd.DataFrame, metrics: pd.DataFrame, experiment: str = "EXP002c") -> None:
     lines = [
-        "# EXP002c country-scoped postings benchmark",
+        f"# {experiment} country-scoped postings benchmark",
         "",
         "The country-scoped postings indexes (schema 2) are built once and reused for all S1 query batches.",
         "The production path has no character n-gram fallback and no S2/S3 scan during querying.",
@@ -229,6 +237,12 @@ def write_report(path: Path, build: pd.DataFrame, metrics: pd.DataFrame) -> None
             f"{row.p99_candidates:.0f} | {row.query_seconds:.1f} | {row.peak_rss_mb:.1f} |"
         )
     lines.append("")
+    lines.extend(["## Intersection scheduling", "",
+                  "| Sample | Slice | Scheduler | Mean probes/source query | p95 probes | SQL seconds |",
+                  "|---|---|---|---:|---:|---:|"])
+    for row in metrics.itertuples(index=False):
+        lines.append(f"| {row.sample} | {row.group} | {row.intersection_scheduler} | {row.average_intersection_probes_per_source_query:.2f} | {row.p95_intersection_probes_per_source_query:.1f} | {row.intersection_sql_seconds:.3f} |")
+    lines.append("")
     lines.append("Peak RSS is the cumulative process high-water mark, including builds if performed in this process. Query timing excludes S1/GT loading and metric aggregation. The 5k batch may benefit from caches warmed by 1k. Cap-hit rates use S1/source queries as denominator; candidate contribution sets overlap; token-only is incremental to exact passes. Full diagnostics and slices are in the CSV tables.")
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -237,12 +251,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", type=Path, default=REPOSITORY_ROOT / "data" / "raw")
     parser.add_argument("--index-dir", type=Path, default=REPOSITORY_ROOT / "results" / "artifacts" / "exp002c_source_index")
-    parser.add_argument("--results-dir", type=Path, default=REPOSITORY_ROOT / "results" / "exp002c")
+    parser.add_argument("--results-dir", type=Path, help="Fresh output directory (required for selective_v1)")
     parser.add_argument("--config", type=Path, default=REPOSITORY_ROOT / "configs" / "exp002c_postings.json")
     parser.add_argument("--build-index", action="store_true", help="Build missing source indexes once; otherwise require complete indexes.")
     parser.add_argument("--rebuild-index", action="store_true", help="Explicitly replace complete source index files.")
     parser.add_argument("--build-only", action="store_true", help="Build/reuse indexes and exit before queries.")
-    parser.add_argument("--sample-sizes", type=int, nargs="+", default=[1000, 5000])
+    parser.add_argument("--sample-sizes", type=int, nargs="+", help="Defaults to 1k for selective_v1; legacy defaults to 1k/5k")
+    parser.add_argument("--reviewed-1k", action="store_true", help="Run >1k selective_v1 only after its 1k results have been reviewed/authorized")
     parser.add_argument("--budget", default="postings")
     parser.add_argument("--sample-seed", type=int, default=2032)
     return parser.parse_args()
@@ -252,10 +267,25 @@ def main() -> int:
     args = parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     retrieval_config = SourceIndexConfig.from_config(config)
+    selective = retrieval_config.intersection_scheduler == "selective_v1"
+    experiment = "exp002e" if selective else "exp002c"
+    if args.sample_sizes is None:
+        args.sample_sizes = [1000] if selective else [1000, 5000]
+    if selective:
+        if args.build_index or args.rebuild_index or args.build_only:
+            raise ValueError("EXP002e requires existing schema-2 indexes; build flags are prohibited")
+        if args.sample_seed != 2032:
+            raise ValueError("EXP002e comparison requires seed 2032")
+        if max(args.sample_sizes) > 1000 and not args.reviewed_1k:
+            raise ValueError("Review/authorize this variant's 1k result before using --reviewed-1k for 5k")
+        if args.results_dir is None:
+            raise ValueError("EXP002e requires an explicit fresh --results-dir")
+        if args.results_dir.exists() and any(args.results_dir.iterdir()):
+            raise FileExistsError("Choose a fresh results directory to preserve measured evidence")
     budget = load_budget(config, args.budget)
     data_root = args.data_root.absolute()
     index_dir = args.index_dir.absolute()
-    results_dir = args.results_dir.absolute()
+    results_dir = (args.results_dir or REPOSITORY_ROOT / "results/exp002c").absolute()
     tables_dir = results_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
     if any(size <= 0 or size > 5000 for size in args.sample_sizes):
@@ -268,6 +298,8 @@ def main() -> int:
         "schema_version": INDEX_SCHEMA_VERSION, "sample_sizes": args.sample_sizes,
         "sample_seed": args.sample_seed, "budget": args.budget,
         "index_dir": str(index_dir), "build_only": args.build_only,
+        "experiment": experiment, "resolved_source_config": asdict(retrieval_config),
+        "intersection_scheduler": retrieval_config.intersection_scheduler,
     }
     (results_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -277,15 +309,20 @@ def main() -> int:
         index_path = _index_path(index_dir, source)
         if not index_path.exists() and not args.build_index:
             raise FileNotFoundError(
-                f"Missing {index_path}. Run once with --build-index; query batches will then reuse it."
+                f"Missing {index_path}. " + (
+                    "EXP002e requires completed schema-2 indexes and never rebuilds them."
+                    if selective else "Run once with --build-index; query batches will then reuse it."
+                )
             )
-        result = build_or_open_source_index(
-            source_path,
-            source,
-            index_dir,
-            rebuild=args.rebuild_index,
-            chunksize=int(config["index_chunk_size"]),
-        )
+        if selective:
+            # Never call the builder, or scan/stat S2/S3 TSVs in this path.
+            with SourceSideIndex(index_path, source, retrieval_config) as index:
+                result = IndexBuildResult(source, index_path, True, index.row_count, 0.0, index_path.stat().st_size)
+        else:
+            result = build_or_open_source_index(
+                source_path, source, index_dir, rebuild=args.rebuild_index,
+                chunksize=int(config["index_chunk_size"]),
+            )
         build_rows.append(
             {
                 "source": result.source,
@@ -297,7 +334,7 @@ def main() -> int:
                 "peak_rss_mb": peak_rss_mb(),
             }
         )
-        pd.DataFrame(build_rows).to_csv(tables_dir / "exp002c_index_build.csv", index=False)
+        pd.DataFrame(build_rows).to_csv(tables_dir / f"{experiment}_index_build.csv", index=False)
     build = pd.DataFrame(build_rows)
     if args.build_only:
         return 0
@@ -321,11 +358,11 @@ def main() -> int:
             id_rows.extend({"sample": f"s1_{size}", "source1_entity_id": entity_id} for entity_id in ids)
             print(f"Querying {size:,} S1 entities against reusable indexes ...", flush=True)
             metric_rows.extend(run_benchmark(records, truth, indexes, budget, ids, f"s1_{size}", diagnostic_rows))
-            pd.DataFrame(metric_rows).to_csv(tables_dir / "exp002c_blocker_benchmark.csv", index=False)
-            pd.DataFrame(diagnostic_rows).fillna(0).to_csv(tables_dir / "exp002c_query_diagnostics.csv", index=False)
-            pd.DataFrame(id_rows).to_csv(tables_dir / "exp002c_sample_ids.csv", index=False)
+            pd.DataFrame(metric_rows).to_csv(tables_dir / f"{experiment}_blocker_benchmark.csv", index=False)
+            pd.DataFrame(diagnostic_rows).fillna(0).to_csv(tables_dir / f"{experiment}_query_diagnostics.csv", index=False)
+            pd.DataFrame(id_rows).to_csv(tables_dir / f"{experiment}_sample_ids.csv", index=False)
     metrics = pd.DataFrame(metric_rows)
-    write_report(results_dir / "exp002c_blocker_benchmark.md", build, metrics)
+    write_report(results_dir / f"{experiment}_blocker_benchmark.md", build, metrics, experiment.upper())
     print(metrics.query('dimension == "overall"')[["sample", "positive_link_recall", "average_candidates", "query_seconds", "peak_rss_mb"]].to_string(index=False), flush=True)
     return 0
 

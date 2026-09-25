@@ -20,12 +20,17 @@ from itertools import combinations
 from pathlib import Path
 
 from .data import iter_source_chunks
+from .intersection_scheduler import plan_intersections
 from .multipass import PASS_NAMES, RetrievedCandidate
 from .normalize import TextRepresentations, represent_address, represent_name
 from .sampling import SourceRecord
 from .similarity import token_jaccard, token_overlap
 
 INDEX_SCHEMA_VERSION = 2
+OPTIONAL_SCHEDULER_KEYS = frozenset({
+    "intersection_scheduler", "selective_max_anchor_df",
+    "selective_max_expected_hits", "selective_max_probes_per_term",
+})
 
 
 @dataclass(frozen=True)
@@ -46,9 +51,17 @@ class SourceIndexConfig:
     max_intersections: int = 10
     max_intersection_hits: int = 150
     record_batch_size: int = 400
+    intersection_scheduler: str = "legacy"
+    selective_max_anchor_df: int = 50_000
+    selective_max_expected_hits: int = 150
+    selective_max_probes_per_term: int = 6
 
     def __post_init__(self) -> None:
+        if self.intersection_scheduler not in {"legacy", "selective_v1"}:
+            raise ValueError("intersection_scheduler must be legacy or selective_v1")
         for field in fields(self):
+            if field.name == "intersection_scheduler":
+                continue
             value = getattr(self, field.name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{field.name} must be a positive integer")
@@ -59,8 +72,11 @@ class SourceIndexConfig:
         if not isinstance(values, dict):
             raise ValueError("Explicit source_index configuration required (use exp002c_postings.json)")
         expected = {field.name for field in fields(cls)}
-        if set(values) != expected:
-            raise ValueError(f"source_index keys mismatch: missing={expected - set(values)}, unknown={set(values) - expected}")
+        required = expected - OPTIONAL_SCHEDULER_KEYS
+        if values.get("intersection_scheduler", "legacy") == "selective_v1":
+            required = expected  # New configs explicitly pin every scheduler knob.
+        if not required <= set(values) or set(values) - expected:
+            raise ValueError(f"source_index keys mismatch: missing={required - set(values)}, unknown={set(values) - expected}")
         return cls(**values)
 
 
@@ -178,20 +194,53 @@ class SourceSideIndex:
         return ids
 
     def _intersections(self, country: str, terms: list[tuple[str, str]], origins: dict[int, set[str]]) -> None:
+        started = time.perf_counter()
+        initial_ids = set(origins)
         ranked = sorted(
             ((self._df(field, token, country), field, token) for field, token in set(terms)),
         )
         ranked = [term for term in ranked if term[0] > 0]
         if self.intersection_trace is not None:
             self.intersection_trace["ranked_terms"] = ranked
-        ranked = ranked[:self.config.intersection_terms]
-        count = 0
-        for left, right in combinations(ranked, 2):
-            if left[0] > self.config.intersection_anchor_df or count >= self.config.max_intersections:
-                break
-            count += 1
+        if self.config.intersection_scheduler == "legacy":
+            # Preserve the exact historical prefix and early-break semantics.
+            ranked = ranked[:self.config.intersection_terms]
+            pairs = []
+            combinations_in_pool = list(combinations(ranked, 2))
+            self.last_diagnostics["intersection_pairs_considered"] = len(combinations_in_pool)
+            for left, right in combinations_in_pool:
+                if left[0] > self.config.intersection_anchor_df or len(pairs) >= self.config.max_intersections:
+                    break
+                pairs.append((left, right))
+            self.last_diagnostics["intersection_pairs_skipped_anchor"] = sum(left[0] > self.config.intersection_anchor_df for left, _ in combinations_in_pool)
+        else:
+            plan = plan_intersections(
+                ranked, self._country_count(country), term_limit=self.config.intersection_terms,
+                probe_limit=self.config.max_intersections,
+                ordinary_anchor_df=self.config.intersection_anchor_df,
+                selective_anchor_df=self.config.selective_max_anchor_df,
+                max_expected_hits=self.config.selective_max_expected_hits,
+                max_probes_per_term=self.config.selective_max_probes_per_term,
+            )
+            pairs = plan.pairs
+            ranked = list(plan.terms)
+            self.last_diagnostics.update(
+                intersection_pairs_considered=plan.considered,
+                intersection_pairs_skipped_anchor=plan.skipped_anchor,
+                intersection_pairs_skipped_selectivity=plan.skipped_selectivity,
+                intersection_pairs_skipped_term_quota=plan.skipped_term_quota,
+            )
+        if self.intersection_trace is not None:
+            self.intersection_trace["scheduler"] = self.config.intersection_scheduler
+            self.intersection_trace["selected_terms"] = ranked
+        self.last_diagnostics["intersection_pairs_skipped_rules"] = (
+            self.last_diagnostics["intersection_pairs_skipped_anchor"] +
+            self.last_diagnostics["intersection_pairs_skipped_selectivity"]
+        )
+        for left, right in pairs:
             # CROSS JOIN fixes the small anchor first. Each probe uses the full
             # posting primary key; no materialization of the common right list.
+            probe_started = time.perf_counter()
             rows = list(self.connection.execute(
                 "SELECT a.record_id FROM postings AS a CROSS JOIN postings AS b "
                 "WHERE a.country=? AND a.field=? AND a.token=? "
@@ -199,6 +248,7 @@ class SourceSideIndex:
                 "ORDER BY a.record_id LIMIT ?",
                 (country, left[1], left[2], right[1], right[2], self.config.max_intersection_hits + 1),
             ))
+            self.last_diagnostics["intersection_sql_seconds"] += time.perf_counter() - probe_started
             self.last_diagnostics["intersection_queries"] += 1
             self.last_diagnostics["postings_looked_up"] += 2
             if self.intersection_trace is not None:
@@ -206,17 +256,22 @@ class SourceSideIndex:
                     "left": left, "right": right,
                     "hits_bounded": len(rows),
                     "overflow": len(rows) > self.config.max_intersection_hits,
+                    "expected_hits_proxy": left[0] * right[0] / max(1, self._country_count(country)),
+                    "record_ids": [int(row[0]) for row in rows] if len(rows) <= self.config.max_intersection_hits else [],
                 })
             if len(rows) > self.config.max_intersection_hits:
                 self.last_diagnostics["intersection_overflows"] += 1
                 continue  # Reject an uninformative whole intersection, never an arbitrary prefix.
             self.last_diagnostics["posting_ids_returned"] += len(rows)
+            self.last_diagnostics["intersection_nonempty_successes"] += int(bool(rows))
             for row in rows:
                 for _, field, token in (left, right):
                     origins[int(row[0])].add(
                         "name_token" if field == "name" else
                         "numeric_address" if token.isdecimal() else "address_token"
                     )
+        self.last_diagnostics["intersection_unique_candidate_ids"] = len(set(origins) - initial_ids)
+        self.last_diagnostics["intersection_total_seconds"] = time.perf_counter() - started
 
     def _records(self, ids: set[int]) -> dict[int, sqlite3.Row]:
         if not ids:

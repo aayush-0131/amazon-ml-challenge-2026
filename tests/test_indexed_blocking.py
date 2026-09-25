@@ -122,7 +122,8 @@ def test_config_is_explicit_and_validated() -> None:
     config = json.loads((root / "configs/exp002c_postings.json").read_text())
     actual = SourceIndexConfig.from_config(config)
     assert (actual.max_name_token_df, actual.max_address_token_df, actual.max_numeric_token_df) == (60, 40, 250)
-    assert asdict(actual) == config["source_index"]
+    assert {key: asdict(actual)[key] for key in config["source_index"]} == config["source_index"]
+    assert actual.intersection_scheduler == "legacy"
     with pytest.raises(ValueError, match="Explicit source_index"):
         SourceIndexConfig.from_config({})
     config["source_index"]["typo"] = 1

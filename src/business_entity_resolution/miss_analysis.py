@@ -78,6 +78,8 @@ def intersection_diagnosis(index: SourceSideIndex, shared: set[tuple[str, str]])
     No diagnostic SQL intersection is re-executed.
     """
     trace = index.intersection_trace
+    if index.config.intersection_scheduler != "legacy":
+        raise ValueError("EXP002d diagnosis describes legacy intersection ordering; use the historical EXP002c config")
     if trace is None:
         raise ValueError("Intersection diagnosis requires retrieve(trace=True)")
     cfg = index.config
