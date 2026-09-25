@@ -24,6 +24,15 @@ import numpy as np
 import pandas as pd
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+FRONTIER_DIAGNOSTICS = (
+    "intersection_planned_pairs", "intersection_queries",
+    "intersection_pairs_skipped_anchor", "intersection_pairs_skipped_selectivity",
+    "intersection_pairs_skipped_term_quota", "intersection_pairs_skipped_candidate_budget",
+    "intersection_overflows", "intersection_nonempty_successes", "intersection_empty_probes",
+    "intersection_unique_candidate_ids", "intersection_candidate_budget_reached",
+    "candidates_before_cap", "eligible_before_final_cap", "selected_candidates",
+    "intersection_sql_seconds", "intersection_total_seconds",
+)
 SRC_ROOT = REPOSITORY_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -198,6 +207,10 @@ def run_benchmark(
         row["projected_1732544_s1_query_hours"] = row["average_query_seconds_per_s1"] * 1_732_544 / 3600
         row["recall_before_cap"] = sum(d["true_links_before_cap"] for d in scope) / row["true_link_count"] if row["true_link_count"] else 1.0
         row["source_query_count"] = len(scope)
+        for key in FRONTIER_DIAGNOSTICS:
+            values = [d.get(key, 0) for d in scope]
+            row[f"average_{key}_per_source_query"] = float(np.mean(values))
+            row[f"p95_{key}_per_source_query"] = float(np.quantile(values, .95))
         row["intersection_scheduler"] = scope[0]["intersection_scheduler"]
         row["average_intersection_probes_per_source_query"] = sum(d.get("intersection_queries", 0) for d in scope) / len(scope)
         row["p95_intersection_probes_per_source_query"] = float(np.quantile([d.get("intersection_queries", 0) for d in scope], .95))
@@ -251,13 +264,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", type=Path, default=REPOSITORY_ROOT / "data" / "raw")
     parser.add_argument("--index-dir", type=Path, default=REPOSITORY_ROOT / "results" / "artifacts" / "exp002c_source_index")
-    parser.add_argument("--results-dir", type=Path, help="Fresh output directory (required for selective_v1)")
+    parser.add_argument("--results-dir", type=Path, help="Fresh output directory (required for selective schedulers)")
     parser.add_argument("--config", type=Path, default=REPOSITORY_ROOT / "configs" / "exp002c_postings.json")
     parser.add_argument("--build-index", action="store_true", help="Build missing source indexes once; otherwise require complete indexes.")
     parser.add_argument("--rebuild-index", action="store_true", help="Explicitly replace complete source index files.")
     parser.add_argument("--build-only", action="store_true", help="Build/reuse indexes and exit before queries.")
-    parser.add_argument("--sample-sizes", type=int, nargs="+", help="Defaults to 1k for selective_v1; legacy defaults to 1k/5k")
-    parser.add_argument("--reviewed-1k", action="store_true", help="Run >1k selective_v1 only after its 1k results have been reviewed/authorized")
+    parser.add_argument("--sample-sizes", type=int, nargs="+", help="Defaults to 1k for selective schedulers; legacy defaults to 1k/5k")
+    parser.add_argument("--reviewed-1k", action="store_true", help="Run >1k selective benchmarks only after their 1k results have been reviewed/authorized")
     parser.add_argument("--budget", default="postings")
     parser.add_argument("--sample-seed", type=int, default=2032)
     return parser.parse_args()
@@ -267,19 +280,20 @@ def main() -> int:
     args = parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     retrieval_config = SourceIndexConfig.from_config(config)
-    selective = retrieval_config.intersection_scheduler == "selective_v1"
-    experiment = "exp002e" if selective else "exp002c"
+    selective = retrieval_config.intersection_scheduler != "legacy"
+    experiment = {"legacy": "exp002c", "selective_v1": "exp002e",
+                  "selective_v2_compact": "exp002f"}[retrieval_config.intersection_scheduler]
     if args.sample_sizes is None:
         args.sample_sizes = [1000] if selective else [1000, 5000]
     if selective:
         if args.build_index or args.rebuild_index or args.build_only:
-            raise ValueError("EXP002e requires existing schema-2 indexes; build flags are prohibited")
+            raise ValueError(f"{experiment} requires existing schema-2 indexes; build flags are prohibited")
         if args.sample_seed != 2032:
-            raise ValueError("EXP002e comparison requires seed 2032")
+            raise ValueError(f"{experiment} comparison requires seed 2032")
         if max(args.sample_sizes) > 1000 and not args.reviewed_1k:
             raise ValueError("Review/authorize this variant's 1k result before using --reviewed-1k for 5k")
         if args.results_dir is None:
-            raise ValueError("EXP002e requires an explicit fresh --results-dir")
+            raise ValueError(f"{experiment} requires an explicit fresh --results-dir")
         if args.results_dir.exists() and any(args.results_dir.iterdir()):
             raise FileExistsError("Choose a fresh results directory to preserve measured evidence")
     budget = load_budget(config, args.budget)
@@ -289,7 +303,7 @@ def main() -> int:
     tables_dir = results_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
     if any(size <= 0 or size > 5000 for size in args.sample_sizes):
-        raise ValueError("EXP002c preflight is limited to 1–5000 S1; 20k is not authorized yet")
+        raise ValueError("Indexed preflight is limited to 1–5000 S1; 20k is not authorized yet")
     if budget.char_name != 0:
         raise ValueError("EXP002c does not have a character pass")
     manifest = {
@@ -310,7 +324,7 @@ def main() -> int:
         if not index_path.exists() and not args.build_index:
             raise FileNotFoundError(
                 f"Missing {index_path}. " + (
-                    "EXP002e requires completed schema-2 indexes and never rebuilds them."
+                    f"{experiment} requires completed schema-2 indexes and never rebuilds them."
                     if selective else "Run once with --build-index; query batches will then reuse it."
                 )
             )

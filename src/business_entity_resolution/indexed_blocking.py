@@ -30,6 +30,7 @@ INDEX_SCHEMA_VERSION = 2
 OPTIONAL_SCHEDULER_KEYS = frozenset({
     "intersection_scheduler", "selective_max_anchor_df",
     "selective_max_expected_hits", "selective_max_probes_per_term",
+    "compact_unique_candidate_budget",
 })
 
 
@@ -55,10 +56,11 @@ class SourceIndexConfig:
     selective_max_anchor_df: int = 50_000
     selective_max_expected_hits: int = 150
     selective_max_probes_per_term: int = 6
+    compact_unique_candidate_budget: int = 150
 
     def __post_init__(self) -> None:
-        if self.intersection_scheduler not in {"legacy", "selective_v1"}:
-            raise ValueError("intersection_scheduler must be legacy or selective_v1")
+        if self.intersection_scheduler not in {"legacy", "selective_v1", "selective_v2_compact"}:
+            raise ValueError("Unknown intersection_scheduler")
         for field in fields(self):
             if field.name == "intersection_scheduler":
                 continue
@@ -74,7 +76,9 @@ class SourceIndexConfig:
         expected = {field.name for field in fields(cls)}
         required = expected - OPTIONAL_SCHEDULER_KEYS
         if values.get("intersection_scheduler", "legacy") == "selective_v1":
-            required = expected  # New configs explicitly pin every scheduler knob.
+            required = expected - {"compact_unique_candidate_budget"}
+        elif values.get("intersection_scheduler") == "selective_v2_compact":
+            required = expected  # Compact configs pin every knob explicitly.
         if not required <= set(values) or set(values) - expected:
             raise ValueError(f"source_index keys mismatch: missing={required - set(values)}, unknown={set(values) - expected}")
         return cls(**values)
@@ -196,6 +200,14 @@ class SourceSideIndex:
     def _intersections(self, country: str, terms: list[tuple[str, str]], origins: dict[int, set[str]]) -> None:
         started = time.perf_counter()
         initial_ids = set(origins)
+        compact = self.config.intersection_scheduler == "selective_v2_compact"
+        self.last_diagnostics.update(
+            intersection_planned_pairs=0, intersection_pairs_skipped_candidate_budget=0,
+            intersection_candidate_budget_reached=0, intersection_empty_probes=0,
+            intersection_pairs_skipped_term_quota=0, intersection_pairs_skipped_selectivity=0,
+            intersection_queries=0, intersection_overflows=0, intersection_nonempty_successes=0,
+            intersection_sql_seconds=0.0,
+        )
         ranked = sorted(
             ((self._df(field, token, country), field, token) for field, token in set(terms)),
         )
@@ -221,6 +233,7 @@ class SourceSideIndex:
                 selective_anchor_df=self.config.selective_max_anchor_df,
                 max_expected_hits=self.config.selective_max_expected_hits,
                 max_probes_per_term=self.config.selective_max_probes_per_term,
+                gate_all_pairs=compact,
             )
             pairs = plan.pairs
             ranked = list(plan.terms)
@@ -233,11 +246,21 @@ class SourceSideIndex:
         if self.intersection_trace is not None:
             self.intersection_trace["scheduler"] = self.config.intersection_scheduler
             self.intersection_trace["selected_terms"] = ranked
+            if compact:
+                self.intersection_trace["planned_probes"] = [
+                    {"left": left, "right": right,
+                     "expected_hits_proxy": left[0] * right[0] / max(1, self._country_count(country))}
+                    for left, right in pairs
+                ]
+                self.intersection_trace["candidate_budget_reached"] = False
+                self.intersection_trace["stopped_by_candidate_budget"] = False
+        self.last_diagnostics["intersection_planned_pairs"] = len(pairs)
         self.last_diagnostics["intersection_pairs_skipped_rules"] = (
             self.last_diagnostics["intersection_pairs_skipped_anchor"] +
             self.last_diagnostics["intersection_pairs_skipped_selectivity"]
         )
-        for left, right in pairs:
+        cumulative = 0  # Unique additions beyond exact/single-token candidates.
+        for pair_number, (left, right) in enumerate(pairs):
             # CROSS JOIN fixes the small anchor first. Each probe uses the full
             # posting primary key; no materialization of the common right list.
             probe_started = time.perf_counter()
@@ -251,6 +274,9 @@ class SourceSideIndex:
             self.last_diagnostics["intersection_sql_seconds"] += time.perf_counter() - probe_started
             self.last_diagnostics["intersection_queries"] += 1
             self.last_diagnostics["postings_looked_up"] += 2
+            overflow = len(rows) > self.config.max_intersection_hits
+            new_count = sum(int(row[0]) not in origins for row in rows) if compact and not overflow else 0
+            cumulative += new_count
             if self.intersection_trace is not None:
                 self.intersection_trace["attempts"].append({
                     "left": left, "right": right,
@@ -259,17 +285,31 @@ class SourceSideIndex:
                     "expected_hits_proxy": left[0] * right[0] / max(1, self._country_count(country)),
                     "record_ids": [int(row[0]) for row in rows] if len(rows) <= self.config.max_intersection_hits else [],
                 })
+                if compact:
+                    self.intersection_trace["attempts"][-1].update(
+                        new_candidate_ids=new_count,
+                        cumulative_unique_candidate_count=cumulative,
+                    )
             if len(rows) > self.config.max_intersection_hits:
                 self.last_diagnostics["intersection_overflows"] += 1
                 continue  # Reject an uninformative whole intersection, never an arbitrary prefix.
             self.last_diagnostics["posting_ids_returned"] += len(rows)
             self.last_diagnostics["intersection_nonempty_successes"] += int(bool(rows))
+            self.last_diagnostics["intersection_empty_probes"] += int(not rows)
             for row in rows:
                 for _, field, token in (left, right):
                     origins[int(row[0])].add(
                         "name_token" if field == "name" else
                         "numeric_address" if token.isdecimal() else "address_token"
                     )
+            if compact and cumulative >= self.config.compact_unique_candidate_budget:
+                remaining = len(pairs) - pair_number - 1
+                self.last_diagnostics["intersection_candidate_budget_reached"] = 1
+                self.last_diagnostics["intersection_pairs_skipped_candidate_budget"] = remaining
+                if self.intersection_trace is not None:
+                    self.intersection_trace["candidate_budget_reached"] = True
+                    self.intersection_trace["stopped_by_candidate_budget"] = remaining > 0
+                break  # Keep the complete successful result; suppress only later SQL.
         self.last_diagnostics["intersection_unique_candidate_ids"] = len(set(origins) - initial_ids)
         self.last_diagnostics["intersection_total_seconds"] = time.perf_counter() - started
 

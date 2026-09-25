@@ -83,7 +83,7 @@ def test_full_configured_probe_bound():
 def test_explicit_configs_and_independent_cap(variant, dfs):
     config = json.loads((ROOT / f"configs/exp002e_{variant}.json").read_text())
     cfg = SourceIndexConfig.from_config(config)
-    assert asdict(cfg) == config["source_index"]
+    assert {k: asdict(cfg)[k] for k in config["source_index"]} == config["source_index"]
     assert (cfg.max_name_token_df, cfg.max_address_token_df, cfg.max_numeric_token_df) == dfs
     assert (cfg.intersection_terms, cfg.max_intersections) == (16, 24)
     assert cfg.intersection_scheduler == "selective_v1"
@@ -177,7 +177,11 @@ def test_indexed_probes_overflow_provenance_and_open_country(tmp_path, hit_limit
     assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
 
 
-def test_trace_and_benchmark_diagnostics_reuse_without_target_tsv(tmp_path, monkeypatch):
+@pytest.mark.parametrize("experiment,variant,strategy", [
+    ("exp002e", "intersection_only", "selective_v1"),
+    ("exp002f", "compact_6", "selective_v2_compact"),
+])
+def test_trace_and_benchmark_diagnostics_reuse_without_target_tsv(tmp_path, monkeypatch, experiment, variant, strategy):
     paths = [build_fixture(tmp_path, [(f"{s}-1", "Alpha Beta", "12 Road", "France")], s) for s in ("S2", "S3")]
     before = [path.read_bytes() for path in paths]
     # The benchmark should have no dependency on raw target TSVs or builder code.
@@ -195,7 +199,7 @@ def test_trace_and_benchmark_diagnostics_reuse_without_target_tsv(tmp_path, monk
     (raw / "train_ground_truth.tsv").write_text("source1_entity_id\tmatched_entity_ids\nS1-1\tS2-1,S3-1\n")
     subset = tmp_path / "subset.csv"
     subset.write_text("source1_entity_id\nS1-1\n")
-    config = json.loads((ROOT / "configs/exp002e_intersection_only.json").read_text())
+    config = json.loads((ROOT / f"configs/{experiment}_{variant}.json").read_text())
     config["subset_ids_path"] = str(subset)
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config))
@@ -203,15 +207,18 @@ def test_trace_and_benchmark_diagnostics_reuse_without_target_tsv(tmp_path, monk
               "--data-root", str(raw.parent), "--results-dir", str(tmp_path / "out")]
     monkeypatch.setattr(sys, "argv", common + ["--sample-sizes", "1"])
     assert module.main() == 0
-    metrics = pd.read_csv(tmp_path / "out/tables/exp002e_blocker_benchmark.csv")
+    metrics = pd.read_csv(tmp_path / f"out/tables/{experiment}_blocker_benchmark.csv")
     overall = metrics[metrics.dimension.eq("overall")].iloc[0]
-    assert overall.intersection_scheduler == "selective_v1"
+    assert overall.intersection_scheduler == strategy
     assert overall.positive_link_recall == 1
     assert overall.average_intersection_probes_per_source_query <= 24
     assert overall.p95_intersection_probes_per_source_query <= 24
     assert overall.intersection_sql_seconds >= 0
+    for key in module.FRONTIER_DIAGNOSTICS:
+        assert f"average_{key}_per_source_query" in metrics
+        assert f"p95_{key}_per_source_query" in metrics
     assert [path.read_bytes() for path in paths] == before
-    for flags in (["--build-index"], ["--rebuild-index"], ["--sample-sizes", "5000"]):
+    for flags in (["--build-index"], ["--rebuild-index"], ["--build-only"], ["--sample-sizes", "5000"], ["--sample-seed", "2026"]):
         monkeypatch.setattr(sys, "argv", common + flags)
         with pytest.raises(ValueError):
             module.main()

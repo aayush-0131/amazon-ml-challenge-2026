@@ -1,4 +1,4 @@
-"""Label-free, bounded Python planning for selective_v1 intersection probes."""
+"""Label-free bounded planning for selective_v1 and selective_v2_compact."""
 from __future__ import annotations
 
 from collections import Counter
@@ -32,7 +32,7 @@ class IntersectionPlan:
 def plan_intersections(
     terms: list[Term], country_count: int, *, term_limit: int, probe_limit: int,
     ordinary_anchor_df: int, selective_anchor_df: int, max_expected_hits: int,
-    max_probes_per_term: int,
+    max_probes_per_term: int, gate_all_pairs: bool = False,
 ) -> IntersectionPlan:
     """Plan all probes before SQL; changing input order cannot change the plan.
 
@@ -44,6 +44,8 @@ def plan_intersections(
     Greedy fairness prioritizes less-used endpoints, then less-used pair kinds,
     then selectivity. A hard term-use quota prevents star-shaped probe schedules.
     Enumeration is O(term_limit**2) in Python; issued SQL probes <= probe_limit.
+    Compact mode sets gate_all_pairs=True to apply the proxy gate even below
+    the ordinary anchor bound. The default preserves selective_v1 exactly.
     """
     if country_count < 0 or any(value <= 0 for value in (
         term_limit, probe_limit, ordinary_anchor_df, selective_anchor_df,
@@ -64,7 +66,7 @@ def plan_intersections(
     for left, right in candidates:
         if left[0] > selective_anchor_df:
             skipped_anchor += 1
-        elif left[0] > ordinary_anchor_df and (
+        elif (gate_all_pairs or left[0] > ordinary_anchor_df) and (
             country_count == 0 or left[0] * right[0] > max_expected_hits * country_count
         ):
             skipped_selectivity += 1
