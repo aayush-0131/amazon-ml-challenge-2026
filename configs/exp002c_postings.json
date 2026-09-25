@@ -1,0 +1,33 @@
+{
+  "subset_ids_path": "results/tables/exp001_subset_ids.csv",
+  "index_chunk_size": 10000,
+  "source_index": {
+    "max_exact_hits": 250,
+    "name_query_terms": 4,
+    "address_query_terms": 4,
+    "numeric_query_terms": 3,
+    "max_name_token_df": 60,
+    "max_address_token_df": 40,
+    "max_numeric_token_df": 250,
+    "min_name_token_length": 3,
+    "min_address_token_length": 3,
+    "intersection_anchor_df": 5000,
+    "intersection_terms": 8,
+    "max_intersections": 10,
+    "max_intersection_hits": 150,
+    "record_batch_size": 400
+  },
+  "blocker_budgets": [
+    {
+      "name": "postings",
+      "total_per_source": 40,
+      "exact_name": 40,
+      "exact_address": 40,
+      "name_signature": 40,
+      "name_token": 40,
+      "address_token": 40,
+      "numeric_address": 40,
+      "char_name": 0
+    }
+  ]
+}

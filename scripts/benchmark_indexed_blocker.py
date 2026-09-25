@@ -9,10 +9,12 @@ to the explicit, one-time ``--build-index`` step.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import resource
 import sys
+import subprocess
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -26,8 +28,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from business_entity_resolution.indexed_blocking import (  # noqa: E402
+    INDEX_SCHEMA_VERSION,
     SourceIndexConfig,
     SourceSideIndex,
+    _index_path,
     build_or_open_source_index,
 )
 from business_entity_resolution.multipass import (  # noqa: E402
@@ -144,15 +148,33 @@ def run_benchmark(
     budget: CandidateBudget,
     sample_ids: list[str],
     sample_name: str,
+    diagnostics_out: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     started = time.monotonic()
     selected: dict[str, set[str]] = defaultdict(set)
+    diagnostic_rows: list[dict[str, object]] = []
     for entity_id in sample_ids:
         record = records[entity_id]
         for source, index in indexes.items():
-            candidates = select_candidates_for_budget(index.retrieve(record), budget)
+            query_started = time.monotonic()
+            pool = index.retrieve(record)
+            eligible = [candidate for candidate in pool if candidate.selected_by(budget)]
+            candidates = select_candidates_for_budget(pool, budget)
+            diagnostic = {
+                "sample": sample_name, "source1_entity_id": entity_id,
+                "source": source, "country": record.country,
+                **dict(index.last_diagnostics),
+                "eligible_before_final_cap": len(eligible),
+                "cap_hit": int(len(candidates) == budget.total_per_source),
+                "cap_truncated": int(len(eligible) > budget.total_per_source),
+                "selected_candidates": len(candidates),
+                "true_links_before_cap": sum(c.candidate_entity_id in truth[entity_id] for c in pool),
+                "selected_exact_candidates": sum(any(getattr(c, f"{p}_score") > 0 for p in ("exact_name", "exact_address", "name_signature")) for c in candidates),
+                "query_seconds": time.monotonic() - query_started,
+            }
+            diagnostic_rows.append(diagnostic)
             selected[entity_id].update(candidate.candidate_entity_id for candidate in candidates)
-    return summarize(
+    metrics = summarize(
         records,
         truth,
         selected,
@@ -160,13 +182,33 @@ def run_benchmark(
         sample_name,
         time.monotonic() - started,
     )
+    for row in metrics:
+        dimension, group = row["dimension"], row["group"]
+        scope = [d for d in diagnostic_rows if (
+            dimension == "overall" or
+            dimension == "country" and d["country"] == group or
+            dimension == "source" and d["source"] == group or
+            dimension == "source_country" and f"{d['source']}|{d['country']}" == group
+        )]
+        row["query_seconds"] = sum(d["query_seconds"] for d in scope)
+        row["average_query_seconds_per_s1"] = row["query_seconds"] / row["entity_count"]
+        row["projected_1732544_s1_query_hours"] = row["average_query_seconds_per_s1"] * 1_732_544 / 3600
+        row["recall_before_cap"] = sum(d["true_links_before_cap"] for d in scope) / row["true_link_count"] if row["true_link_count"] else 1.0
+        row["source_query_count"] = len(scope)
+        row["cap_hit_rate_per_source_query"] = sum(d["cap_hit"] for d in scope) / len(scope)
+        row["cap_truncated_rate_per_source_query"] = sum(d["cap_truncated"] for d in scope) / len(scope)
+        for key in ("exact_candidates", "token_candidates", "token_only_candidates", "selected_exact_candidates", "candidates_before_cap", "postings_looked_up", "posting_ids_returned", "intersection_queries", "intersection_overflows", "exact_overflow_passes"):
+            row[f"average_{key}_per_s1"] = sum(d.get(key, 0) for d in scope) / row["entity_count"]
+    if diagnostics_out is not None:
+        diagnostics_out.extend(diagnostic_rows)
+    return metrics
 
 
 def write_report(path: Path, build: pd.DataFrame, metrics: pd.DataFrame) -> None:
     lines = [
-        "# EXP002 indexed-blocker benchmark",
+        "# EXP002c country-scoped postings benchmark",
         "",
-        "The target-side SQLite FTS5 indexes are built once and then reused for all S1 query batches.",
+        "The country-scoped postings indexes (schema 2) are built once and reused for all S1 query batches.",
         "The production path has no character n-gram fallback and no S2/S3 scan during querying.",
         "",
         "## Index build/reuse",
@@ -187,19 +229,21 @@ def write_report(path: Path, build: pd.DataFrame, metrics: pd.DataFrame) -> None
             f"{row.p99_candidates:.0f} | {row.query_seconds:.1f} | {row.peak_rss_mb:.1f} |"
         )
     lines.append("")
+    lines.append("Peak RSS is the cumulative process high-water mark, including builds if performed in this process. Query timing excludes S1/GT loading and metric aggregation. The 5k batch may benefit from caches warmed by 1k. Cap-hit rates use S1/source queries as denominator; candidate contribution sets overlap; token-only is incremental to exact passes. Full diagnostics and slices are in the CSV tables.")
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", type=Path, default=REPOSITORY_ROOT / "data" / "raw")
-    parser.add_argument("--index-dir", type=Path, default=REPOSITORY_ROOT / "results" / "artifacts" / "exp002_source_index")
-    parser.add_argument("--results-dir", type=Path, default=REPOSITORY_ROOT / "results")
-    parser.add_argument("--config", type=Path, default=REPOSITORY_ROOT / "configs" / "exp002_m2_8gb.json")
+    parser.add_argument("--index-dir", type=Path, default=REPOSITORY_ROOT / "results" / "artifacts" / "exp002c_source_index")
+    parser.add_argument("--results-dir", type=Path, default=REPOSITORY_ROOT / "results" / "exp002c")
+    parser.add_argument("--config", type=Path, default=REPOSITORY_ROOT / "configs" / "exp002c_postings.json")
     parser.add_argument("--build-index", action="store_true", help="Build missing source indexes once; otherwise require complete indexes.")
     parser.add_argument("--rebuild-index", action="store_true", help="Explicitly replace complete source index files.")
+    parser.add_argument("--build-only", action="store_true", help="Build/reuse indexes and exit before queries.")
     parser.add_argument("--sample-sizes", type=int, nargs="+", default=[1000, 5000])
-    parser.add_argument("--budget", default="recall")
+    parser.add_argument("--budget", default="postings")
     parser.add_argument("--sample-seed", type=int, default=2032)
     return parser.parse_args()
 
@@ -207,21 +251,30 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
+    retrieval_config = SourceIndexConfig.from_config(config)
     budget = load_budget(config, args.budget)
     data_root = args.data_root.absolute()
     index_dir = args.index_dir.absolute()
     results_dir = args.results_dir.absolute()
     tables_dir = results_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    subset_path = REPOSITORY_ROOT / str(config["subset_ids_path"])
-    subset_ids = frozenset(pd.read_csv(subset_path)["source1_entity_id"])
-    records = load_selected_source_records(data_root / "train" / "train_source1.tsv", "S1", subset_ids)
-    truth = load_selected_ground_truth(data_root / "train" / "train_ground_truth.tsv", subset_ids)
+    if any(size <= 0 or size > 5000 for size in args.sample_sizes):
+        raise ValueError("EXP002c preflight is limited to 1–5000 S1; 20k is not authorized yet")
+    if budget.char_name != 0:
+        raise ValueError("EXP002c does not have a character pass")
+    manifest = {
+        "config": config, "config_sha256": hashlib.sha256(args.config.read_bytes()).hexdigest(),
+        "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT, text=True).strip(),
+        "schema_version": INDEX_SCHEMA_VERSION, "sample_sizes": args.sample_sizes,
+        "sample_seed": args.sample_seed, "budget": args.budget,
+        "index_dir": str(index_dir), "build_only": args.build_only,
+    }
+    (results_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     build_rows: list[dict[str, object]] = []
     for source in ("S2", "S3"):
         source_path = data_root / "train" / f"train_source{source[-1]}.tsv"
-        index_path = index_dir / f"exp002_{source.lower()}_fts.sqlite"
+        index_path = _index_path(index_dir, source)
         if not index_path.exists() and not args.build_index:
             raise FileNotFoundError(
                 f"Missing {index_path}. Run once with --build-index; query batches will then reuse it."
@@ -231,6 +284,7 @@ def main() -> int:
             source,
             index_dir,
             rebuild=args.rebuild_index,
+            chunksize=int(config["index_chunk_size"]),
         )
         build_rows.append(
             {
@@ -243,19 +297,35 @@ def main() -> int:
                 "peak_rss_mb": peak_rss_mb(),
             }
         )
+        pd.DataFrame(build_rows).to_csv(tables_dir / "exp002c_index_build.csv", index=False)
     build = pd.DataFrame(build_rows)
-    build.to_csv(tables_dir / "exp002_index_build.csv", index=False)
+    if args.build_only:
+        return 0
 
-    with SourceSideIndex(index_dir / "exp002_s2_fts.sqlite", "S2", SourceIndexConfig()) as s2, SourceSideIndex(index_dir / "exp002_s3_fts.sqlite", "S3", SourceIndexConfig()) as s3:
+    subset_path = REPOSITORY_ROOT / str(config["subset_ids_path"])
+    subset_ids = frozenset(pd.read_csv(subset_path)["source1_entity_id"])
+    # IDs are independent of labels; use the same nested hash samples as EXP002b.
+    largest_ids = frozenset(sorted(subset_ids, key=lambda entity_id: (stable_entity_key(entity_id, args.sample_seed), entity_id))[:max(args.sample_sizes)])
+    if max(args.sample_sizes) > len(subset_ids):
+        raise ValueError("Requested sample exceeds configured subset")
+    records = load_selected_source_records(data_root / "train" / "train_source1.tsv", "S1", largest_ids)
+    truth = load_selected_ground_truth(data_root / "train" / "train_ground_truth.tsv", largest_ids)
+
+    with SourceSideIndex(_index_path(index_dir, "S2"), "S2", retrieval_config) as s2, SourceSideIndex(_index_path(index_dir, "S3"), "S3", retrieval_config) as s3:
         indexes = {"S2": s2, "S3": s3}
         metric_rows: list[dict[str, object]] = []
+        diagnostic_rows: list[dict[str, object]] = []
+        id_rows: list[dict[str, object]] = []
         for size in args.sample_sizes:
             ids = benchmark_ids(records, size, args.sample_seed)
+            id_rows.extend({"sample": f"s1_{size}", "source1_entity_id": entity_id} for entity_id in ids)
             print(f"Querying {size:,} S1 entities against reusable indexes ...", flush=True)
-            metric_rows.extend(run_benchmark(records, truth, indexes, budget, ids, f"s1_{size}"))
+            metric_rows.extend(run_benchmark(records, truth, indexes, budget, ids, f"s1_{size}", diagnostic_rows))
+            pd.DataFrame(metric_rows).to_csv(tables_dir / "exp002c_blocker_benchmark.csv", index=False)
+            pd.DataFrame(diagnostic_rows).fillna(0).to_csv(tables_dir / "exp002c_query_diagnostics.csv", index=False)
+            pd.DataFrame(id_rows).to_csv(tables_dir / "exp002c_sample_ids.csv", index=False)
     metrics = pd.DataFrame(metric_rows)
-    metrics.to_csv(tables_dir / "exp002_indexed_blocker_benchmark.csv", index=False)
-    write_report(results_dir / "exp002_indexed_blocker_benchmark.md", build, metrics)
+    write_report(results_dir / "exp002c_blocker_benchmark.md", build, metrics)
     print(metrics.query('dimension == "overall"')[["sample", "positive_link_recall", "average_candidates", "query_seconds", "peak_rss_mb"]].to_string(index=False), flush=True)
     return 0
 

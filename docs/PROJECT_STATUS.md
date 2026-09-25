@@ -6,11 +6,11 @@ Business Entity Resolution challenge.
 
 Current development branch:
 
-`feat/exp002-multipass-learned-matcher`
+`feat/exp002c-fast-postings`
 
 Current production decision:
 
-**EXP002b rejected. EXP002c fast-postings blocker is next.**
+**EXP002b rejected. EXP002c postings implementation ready for AWS 1k/5k verification; results pending.**
 
 ---
 
@@ -88,8 +88,11 @@ No leaderboard submission yet.
 
 ## Immediate Work Queue
 
-1. Implement EXP002c fast postings retrieval.
-2. Benchmark 1k and 5k S1.
+1. EXP002c implementation: schema-2 country-scoped postings and persisted DF,
+   exact passes, bounded rare lists/common-token intersections, batched fetches,
+   explicit `configs/exp002c_postings.json`, query diagnostics and synthetic tests.
+2. On AWS, build the new indexes once, then benchmark 1k and 5k S1 using the
+   same persisted indexes. Commands/artifacts are in `experiments/EXP002.md`.
 3. Require high recall and practical runtime.
 4. If retrieval passes, benchmark 20k.
 5. Train learned pair matcher using hard negatives.
@@ -100,6 +103,14 @@ No leaderboard submission yet.
    - candidate_pairs.tsv
 9. Run official Amazon validator.
 10. Make leaderboard Submission #1.
+
+Only steps 1–3 are currently authorized. No EXP002c full-data runtime, peak RAM
+or recall is known. Schema-1 FTS indexes and prior measured results are retained;
+schema-2 builds use new filenames and atomic `.building.sqlite` publication.
+The revised benchmark refuses samples over 5k. It does not invoke training.
+Required gate: >=96% positive-link recall (stretch 98%), materially improved
+matched all-links retention over EXP001's 68.416%, ideally <=80 candidates/S1,
+no near-universal cap saturation, and practical projected query runtime.
 
 ---
 
