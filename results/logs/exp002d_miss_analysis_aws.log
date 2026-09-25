@@ -1,0 +1,36 @@
+Analyzing 5,000 fixed S1 IDs; schema-2 indexes opened read-only.
+     dimension    group  true_links  discovery_misses  cap_ranking_misses  retained_links  pre_cap_recall  final_recall  matched_entities  matched_all_links_retained_rate  average_current_candidates_per_s1  intersection_term_omitted  intersection_anchor_df_exceeded  intersection_pair_budget_exceeded  intersection_intersection_overflow  intersection_no_usable_combination  intersection_other_unresolved  rare_term_limit_blocked  current_rare_rule_unresolved
+       overall      ALL       17207              1184                 382           15641        0.931191      0.908991              4726                         0.757512                          63.837800                        706                              525                                609                                   8                                  81                              0                        0                             0
+       country    India        6970               702                  24            6244        0.899283      0.895839              1925                         0.736623                          59.176847                        596                              277                                296                                   5                                  26                              0                        0                             0
+       country       US       10237               482                 358            9397        0.952916      0.917945              2801                         0.771867                          67.023569                        110                              248                                313                                   3                                  55                              0                        0                             0
+        source       S2        8316               573                 132            7611        0.931097      0.915224              4325                         0.858728                          31.715800                        328                              253                                320                                   2                                  38                              0                        0                             0
+source_country S2|India        3361               285                  10            3066        0.915204      0.912229              1753                         0.851112                          29.627094                        238                              104                                121                                   2                                  11                              0                        0                             0
+source_country    S2|US        4955               288                 122            4545        0.941877      0.917255              2572                         0.863919                          33.143434                         90                              149                                199                                   0                                  27                              0                        0                             0
+        source       S3        8891               611                 250            8030        0.931279      0.903160              4384                         0.840785                          32.122000                        378                              272                                289                                   6                                  43                              0                        0                             0
+source_country S3|India        3609               417                  14            3178        0.884456      0.880576              1787                         0.810856                          29.549754                        358                              173                                175                                   3                                  15                              0                        0                             0
+source_country    S3|US        5282               194                 236            4852        0.963271      0.918591              2597                         0.861379                          33.880135                         20                               99                                114                                   3                                  28                              0                        0                             0
+Saved analysis to /home/ubuntu/amazon-ml-challenge-2026/results/exp002d_miss_analysis
+	Command being timed: ".venv/bin/python -u scripts/analyze_exp002c_misses.py --config configs/exp002c_postings.json --index-dir results/artifacts/exp002c_source_index --results-dir results/exp002d_miss_analysis --sample-size 5000 --sample-seed 2032"
+	User time (seconds): 124.47
+	System time (seconds): 24.91
+	Percent of CPU this job got: 26%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 9:26.74
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 333584
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 153512
+	Voluntary context switches: 616997
+	Involuntary context switches: 558
+	Swaps: 0
+	File system inputs: 8709528
+	File system outputs: 19072
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+EXP002D_EXIT_CODE=0
