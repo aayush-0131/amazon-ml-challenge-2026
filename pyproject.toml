@@ -11,6 +11,8 @@ dependencies = [
     "pandas==3.0.6",
     "RapidFuzz==3.14.6",
     "scikit-learn==1.9.1",
+    "joblib==1.6.0",
+    "threadpoolctl==3.7.0",
 ]
 
 [tool.setuptools.packages.find]

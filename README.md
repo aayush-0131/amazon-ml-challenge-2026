@@ -32,9 +32,9 @@ data audit
 
 ## Phase-1 audit and evaluation foundation
 
-This repository currently implements the dataset audit, ground-truth parsing,
-entity-level split, and exact competition metric only. It does **not** train a model
-or generate test predictions.
+Phase 1 provides the dataset audit, ground-truth parsing, entity-level split and
+exact competition metric. Later experiment entry points are documented below;
+full inference always requires explicit authorization.
 
 The competition dataset must be available through the ignored `data/raw` symlink:
 
@@ -95,3 +95,26 @@ more headroom. Both configurations use entity-level sampling only. Candidate row
 and validation predictions are derived training artifacts under `results/artifacts/`
 and are intentionally ignored by Git; aggregate metrics and the exact subset IDs are
 saved under `results/tables/`.
+
+## EXP003 indexed reranker and inference
+
+Blocker search is closed: compact_14 is the frozen rule fallback; compact_18
+provides pass-eligible candidates without the old total cap for learned scoring.
+See [EXP003](experiments/EXP003.md) for the fixed 20k TRAIN command, exact
+FIT/TUNE/EVALUATION IDs policy, bundle metadata, four-worker AWS smoke commands,
+restart/merge behavior and official output contract. No index construction occurs
+in these entry points:
+
+```bash
+.venv/bin/python scripts/train_exp003.py --help
+.venv/bin/python scripts/infer_exp003.py run --help
+.venv/bin/python scripts/infer_exp003.py merge --help
+.venv/bin/python -m pytest -q
+git diff --check
+```
+
+EXP003 is implementation-only pending AWS measurement. Do not submit partial
+smoke outputs. Full TEST requires `--allow-full-test`; nothing uploads to the
+leaderboard automatically. Keep the same pinned environment and committed code
+when training and loading bundles. Generated pair matrices/checkpoints/TSVs are
+ignored; preserve aggregate experiment evidence separately.

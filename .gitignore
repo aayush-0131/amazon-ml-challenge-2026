@@ -29,6 +29,16 @@ results/artifacts/
 
 # Generated competition outputs may be huge
 output/*.tsv
+output/**/*.tsv
+output/**/*.sqlite*
+
+# EXP003 disk-backed pairs and sharded inference (keep aggregate JSON/CSV evidence)
+results/exp003*/pairs/
+results/exp003*/**/*.tsv
+results/exp003*/**/*.sqlite*
+results/exp003*/**/worker.lock
+results/exp003*/**/*.building
+*.f32
 
 # Temporary/cache
 tmp/

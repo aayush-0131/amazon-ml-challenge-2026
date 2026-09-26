@@ -6,13 +6,13 @@ Business Entity Resolution challenge.
 
 Current development branch:
 
-`feat/exp002f-compact-intersections`
+`feat/exp003-indexed-learned-reranker`
 
 Current production decision:
 
-**EXP002c: REVISE — architecture retained; recall gate not passed.
-EXP002e: REVISE — discovery gate passed, production cost/candidate pressure failed.
-EXP002f: implementation only / awaiting AWS 1k frontier.**
+**EXP002 blocker search CLOSED. compact_14 is the frozen rule fallback;
+compact_18 is the frozen EXP003 learned-reranker generator.
+EXP003: implementation only / awaiting AWS fixed-20k training.**
 
 ---
 
@@ -90,19 +90,21 @@ No leaderboard submission yet.
 
 ## Immediate Work Queue
 
-1. Run AWS 1k for EXP002f compact_6, compact_10, compact_14 and compact_18,
-   reusing completed schema-2 indexes. Exact commands: `experiments/EXP002.md`.
-2. Review final/pre-cap recall, India/S3 India, all-links retention, candidate
-   counts, intersection probes/overflow, CPU time and RAM across all variants.
-3. Run 5k only for variants explicitly authorized after that review, using
-   `--reviewed-1k` and a fresh output directory. Do not automatically run 20k.
-4. Require the recall/runtime gate before separately authorizing larger runs
-   or learned-matcher work. EXP001 remains the best validated matcher.
+1. Run EXP003 AWS training on the authoritative 20k IDs: 5,999 FIT, 2,001 TUNE,
+   12,000 unchanged EXP001 EVALUATION IDs. See `experiments/EXP003.md`.
+2. Review TUNE-selected learned model against compact_14 fallback, raw versus
+   pass-eligible ceilings, held-out macro F0.5 and source/country slices.
+3. Run the four-shard 100-S1 AWS TEST smoke using existing TEST schema-2 indexes;
+   review outputs/checkpoints, bundle versions and runtime before full inference.
+4. Full TEST requires a separate explicit `--allow-full-test` invocation. No
+   automatic submission, full TRAIN or further blocker redesign is authorized.
 
 Current authorized Codex scope is code/config/tests/documentation and AWS
-handoff only. Do not rebuild indexes, run Amazon benchmarks, train or infer
-on TEST. EXP002f keeps schema 2 and historical EXP002c/e configs unchanged.
-The new scheduler is opt-in (`selective_v2_compact`); legacy remains the default.
+handoff only. Do not rebuild indexes or run Amazon TRAIN/TEST in Codex.
+EXP003 reuses frozen compact_18 pass-eligible candidates, without the old total
+60/source cap before learned scoring. This is NOT identical to the historical
+raw pre-cap ceiling: both ceilings are reported separately. compact_14 fallback
+retains its frozen pass/total caps. No EXP002g will be created.
 EXP002c's AWS 5k final/pre-cap recall is 90.8991%/93.1191%, matched-all retention
 75.7512%, mean candidates 63.8378, query time 71.386 s and peak RSS approximately
 267 MB. Cap hits remain 60.29% per source query. The approximately 6.87-hour
@@ -146,6 +148,24 @@ selectivity skips, read-only reuse, no target scan/build and AWS guardrails.
 Required gate: >=96% positive-link recall (stretch 98%), materially improved
 matched all-links retention over EXP001's 68.416%, ideally <=80 candidates/S1,
 no near-universal cap saturation, and practical projected query runtime.
+
+The preceding gate was the historical blocker-search target. Deadline decision
+after AWS 5k confirmation (`577ca26`): freeze compact_14/18 despite remaining
+India misses and cap pressure. compact_14 final/raw-pre-cap recall is
+94.4557%/96.1876%; compact_18 is 94.4267%/96.5247%. All-links 84.1092%/84.0457%;
+raw pool/source 240.8773/281.2488; eligible/source 93.2823/96.0997; cap-hit
+96.45%/97.79%; actual probes/source 10.3686/12.6621. India raw pre-cap
+93.3572%/93.7590%; S2 India 93.6626%/94.1089%; S3 India 93.0729%/93.4331%.
+
+EXP003 reuses 51 ordered tabular features and deterministic hard-negative
+sampling; compares compact_14 rule, compact_18 rule, logistic and HGB. Thresholds
+and learned-model selection use TUNE only. Inference uses versioned local
+bundles, four deterministic positional shards, transactional SQLite checkpoints,
+read-only indexes and a disk-backed validated merge. Exact contract: one S1 row
+in each TSV, empty singletons, scored candidate pool, predicted subset.
+Synthetic end-to-end tests include the official validator with ID checking;
+no EXP003 Amazon measurements have been produced in Codex. EXP001 remains the
+best **measured** matcher until AWS results arrive.
 
 ---
 
