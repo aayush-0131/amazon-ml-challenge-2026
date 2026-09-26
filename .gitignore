@@ -38,6 +38,9 @@ results/exp003*/**/*.tsv
 results/exp003*/**/*.sqlite*
 results/exp003*/**/worker.lock
 results/exp003*/**/*.building
+results/exp005*/**/*.tsv
+results/exp005*/**/*.sqlite*
+results/exp005*/**/*.building
 *.f32
 
 # Temporary/cache

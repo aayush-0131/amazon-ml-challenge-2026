@@ -1,0 +1,12 @@
+{
+  "max_exact_hits": 200,
+  "policies": [
+    "both_exact",
+    "name_address_half",
+    "address_name_half",
+    "either_half"
+  ],
+  "policy": "either_half",
+  "subset_sha256": "84fa2544c2905fa480ffc0e57a2912143304acb6653a5f6c09a3eefa2a66979c",
+  "tune_macro_fbeta": 0.3934304254937391
+}
