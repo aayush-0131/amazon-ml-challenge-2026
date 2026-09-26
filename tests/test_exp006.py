@@ -1,7 +1,9 @@
 """EXP006 synthetic TRAIN-only isolation and checkpoint tests."""
 import csv
+import importlib.util
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pytest
@@ -57,6 +59,7 @@ def test_sampling_exclusion_stratification_and_determinism(fixture, tmp_path):
     first = exp006.sample(train, tmp_path / "first", size=8, seed=2032)
     second = exp006.sample(train, tmp_path / "second", size=8, seed=2032)
     assert first == second
+    assert first["seed"] == exp006.SEED == 2032
     assert (tmp_path / "first/extra_fit.csv").read_bytes() == (tmp_path / "second/extra_fit.csv").read_bytes()
     _, ids = exp006.load_sample(tmp_path / "first", train)
     assert len(ids) == len(set(ids)) == 8
@@ -76,6 +79,7 @@ def test_generation_resume_and_deterministic_merge(fixture, tmp_path, shards, mo
     for i in range(shards):
         done = exp006.generate(sample, train, indexes, shard_dir, shards=shards, shard=i, checkpoint_every=1)
         assert done["rows"] == len(range(i, 8, shards))
+        assert done["identity"]["sampling_seed"] == json.loads((sample / "manifest.json").read_text())["seed"] == 2032
     first_hash = sha256(shard_dir / "shard_00/done.json")
     exp006.generate(sample, train, indexes, shard_dir, shards=shards, shard=0)
     assert sha256(shard_dir / "shard_00/done.json") == first_hash
@@ -99,6 +103,69 @@ def test_generation_resume_and_deterministic_merge(fixture, tmp_path, shards, mo
         done_path.write_text(json.dumps(done))
         with pytest.raises(ValueError, match="identity"):
             exp006.generate(sample, train, indexes, shard_dir, shards=4, shard=0)
+
+
+def test_nondefault_seed_propagates_and_sample_mismatch_fails_closed(fixture, tmp_path):
+    train, indexes = fixture
+    sample = tmp_path / "custom_seed_sample"
+    manifest = exp006.sample(train, sample, size=8, seed=9187)
+    shard_dir = tmp_path / "custom_seed_shards"
+    done = exp006.generate(sample, train, indexes, shard_dir, shards=1, shard=0)
+    assert manifest["seed"] == done["identity"]["sampling_seed"] == 9187
+    first_pairs = exp006.merge(sample, train, indexes, shard_dir, tmp_path / "custom_seed_merged", shards=1)
+    assert first_pairs["identity"]["sampling_seed"] == 9187
+    altered = dict(manifest)
+    altered["seed"] = 9188
+    exp006.write_json_atomic(sample / "manifest.json", altered)
+    with pytest.raises(ValueError, match="identity"):
+        exp006.generate(sample, train, indexes, shard_dir, shards=1, shard=0)
+    with pytest.raises(ValueError, match="identity"):
+        exp006.merge(sample, train, indexes, shard_dir, tmp_path / "bad_seed_merge", shards=1)
+
+
+def test_merge_cli_has_no_merged_dir_while_fit_and_tune_require_it(monkeypatch, capsys):
+    script = exp006.ROOT / "scripts/run_exp006.py"
+    spec = importlib.util.spec_from_file_location("exp006_cli_test", script)
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    monkeypatch.setattr(sys, "argv", ["run_exp006.py", "merge", "--help"])
+    with pytest.raises(SystemExit) as exited:
+        cli.main()
+    assert exited.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--shard-dir" in help_text and "--output-dir" in help_text
+    assert "--merged-dir" not in help_text
+
+    calls = []
+    monkeypatch.setattr(cli.exp006, "merge", lambda **kwargs: calls.append(("merge", kwargs)) or {})
+    monkeypatch.setattr(cli.exp006, "fit", lambda **kwargs: calls.append(("fit", kwargs)) or {})
+    monkeypatch.setattr(cli.exp006, "tune", lambda **kwargs: calls.append(("tune", kwargs)) or {})
+    common = ["--train-dir", "train", "--index-dir", "indexes", "--sample-dir", "sample",
+              "--output-dir", "output"]
+    monkeypatch.setattr(sys, "argv", ["run_exp006.py", "merge", "--index-dir", "indexes",
+                                  "--sample-dir", "sample", "--shard-dir", "shards",
+                                  "--output-dir", "output"])
+    with pytest.raises(SystemExit) as missing_train:
+        cli.main()
+    assert missing_train.value.code == 2
+    assert "--train-dir" in capsys.readouterr().err
+    monkeypatch.setattr(sys, "argv", ["run_exp006.py", "merge", *common,
+                                  "--shard-dir", "shards", "--shards", "4"])
+    cli.main()
+    assert calls[-1][0] == "merge" and "merged_dir" not in calls[-1][1]
+
+    for command in ("fit", "tune"):
+        args = ["run_exp006.py", command, *common, "--original-dir", "original"]
+        if command == "tune":
+            args.extend(["--fit-dir", "fit"])
+        monkeypatch.setattr(sys, "argv", args)
+        with pytest.raises(SystemExit) as missing:
+            cli.main()
+        assert missing.value.code == 2
+        assert "--merged-dir" in capsys.readouterr().err
+        monkeypatch.setattr(sys, "argv", [*args, "--merged-dir", "merged"])
+        cli.main()
+        assert calls[-1][0] == command and calls[-1][1]["merged_dir"] == Path("merged")
 
 
 def test_interrupted_shard_resumes_without_repeating_committed_entities(fixture, tmp_path, monkeypatch):

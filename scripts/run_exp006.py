@@ -14,7 +14,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("preflight", "sample", "generate", "merge", "fit", "tune", "evaluate"):
         p = sub.add_parser(name)
-        p.add_argument("--train-dir", type=Path, default=ROOT / "data/raw/train")
+        p.add_argument("--train-dir", type=Path, default=ROOT / "data/raw/train", required=name == "merge")
         if name != "sample":
             p.add_argument("--index-dir", type=Path, required=True)
         if name in {"preflight", "fit", "tune", "evaluate"}:
@@ -27,7 +27,7 @@ def main():
         if name == "generate":
             p.add_argument("--shard", type=int, required=True)
             p.add_argument("--checkpoint-every", type=int, default=100)
-        if name in {"merge", "fit", "tune"}:
+        if name in {"fit", "tune"}:
             p.add_argument("--merged-dir", type=Path, required=True)
         if name in {"tune", "evaluate"}:
             p.add_argument("--fit-dir", type=Path, required=True)

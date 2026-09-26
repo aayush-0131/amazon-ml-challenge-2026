@@ -190,7 +190,7 @@ def _identity(sample_dir, data_dir, index_dir, shards):
             "sample_manifest_sha256": sha256(Path(sample_dir) / "manifest.json"),
             "source_identity": manifest["source_identity"], "ground_truth_identity": manifest["ground_truth_identity"],
             "indexes": index_identity(index_dir), "blocker_sha256": CONFIG_HASHES[18],
-            "feature_names": list(FEATURE_NAMES), "sampling_seed": 2031, "shards": shards}, ids
+            "feature_names": list(FEATURE_NAMES), "sampling_seed": manifest["seed"], "shards": shards}, ids
 
 
 def _checkpoint_digest(connection):
