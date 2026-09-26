@@ -42,6 +42,7 @@ results/exp003*/**/*.building
 
 # EXP006 samples contain TRAIN S1 identifiers and checkpointed labeled pairs.
 results/exp006*/
+results/exp007*/
 
 # Temporary/cache
 tmp/
