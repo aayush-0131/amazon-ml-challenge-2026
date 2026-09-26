@@ -75,10 +75,12 @@ ENHANCED_FEATURE_NAMES = (
     "legal_suffix_only_difference", "trans_address_ratio", "trans_address_token_set", "trans_address_token_sort",
     "trans_address_jw", "trans_address_char3", "numeric_token_overlap", "numeric_token_containment",
     "numeric_sets_disjoint", "primary_number_exact", "primary_number_mismatch", "primary_number_log_difference",
-    "postal_like_agreement", "postal_like_conflict", "core_name_primary_conflict", "high_name_numeric_conflict",
+    "secondary_postal_like_agreement", "postal_like_conflict", "core_name_primary_conflict", "high_name_numeric_conflict",
     "left_address_missing_x_name", "right_address_missing_x_name",
 )
 FEATURE_NAMES = OLD_FEATURE_NAMES + ENHANCED_FEATURE_NAMES
+if len(OLD_FEATURE_NAMES) != 51 or len(ENHANCED_FEATURE_NAMES) != 32 or len(set(FEATURE_NAMES)) != 83:
+    raise AssertionError("EXP007 feature names must be 51 legacy plus 32 unique enhanced names")
 
 
 def enhanced_row(left_name: str, right_name: str, left_address: str, right_address: str) -> dict[str, float]:

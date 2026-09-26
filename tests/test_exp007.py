@@ -9,8 +9,10 @@ import pytest
 from business_entity_resolution import exp007
 from business_entity_resolution.evaluation import evaluate_predictions
 from business_entity_resolution.exp007_features import (FEATURE_NAMES, ENHANCED_FEATURE_NAMES,
-    address, core_name, enhanced_row, normalize)
+    address, core_name, enhanced_row, feature_row, normalize)
 from business_entity_resolution.features import FEATURE_NAMES as OLD_FEATURE_NAMES
+from business_entity_resolution.multipass import RetrievedCandidate
+from business_entity_resolution.sampling import SourceRecord
 
 
 @dataclass
@@ -20,6 +22,10 @@ class Record:
 
 def test_secondary_normalization_and_order():
     assert len(OLD_FEATURE_NAMES) == 51
+    assert len(ENHANCED_FEATURE_NAMES) == 32
+    assert len(FEATURE_NAMES) == 83
+    assert len(set(FEATURE_NAMES)) == 83
+    assert not (set(OLD_FEATURE_NAMES) & set(ENHANCED_FEATURE_NAMES))
     assert FEATURE_NAMES[:51] == OLD_FEATURE_NAMES
     assert FEATURE_NAMES[51:] == ENHANCED_FEATURE_NAMES
     assert normalize("Société Électricité") == "societe electricite"
@@ -34,11 +40,33 @@ def test_secondary_normalization_and_order():
     assert enhanced_row("Acme", "Acme", "0012 Road", "12 Road")["primary_number_exact"] == 1
     assert enhanced_row("Acme", "Acme", "12 Road", "13 Road")["primary_number_mismatch"] == 1
     assert enhanced_row("Acme", "Acme", "12 Road", "13 Road")["numeric_sets_disjoint"] == 1
-    assert enhanced_row("Acme", "Acme", "75001 Paris", "75001 Paris")["postal_like_agreement"] == 1
+    assert enhanced_row("Acme", "Acme", "75001 Paris", "75001 Paris")["secondary_postal_like_agreement"] == 1
     assert enhanced_row("Acme", "Acme", "75001 Paris", "75002 Paris")["postal_like_conflict"] == 1
-    assert enhanced_row("Acme", "Acme", "SW1A London", "SW1A London")["postal_like_agreement"] == 1
+    assert enhanced_row("Acme", "Acme", "SW1A London", "SW1A London")["secondary_postal_like_agreement"] == 1
     assert enhanced_row("Acme", "Acme", "", "12 Road")["left_address_missing_x_name"] == 1
     assert normalize("Österreich Handels GmbH") == "osterreich handels gmbh"
+
+
+def test_merged_feature_row_has_all_83_unique_features():
+    source = SourceRecord("S1-1", "Acme Trading LLC", "12 Market Road 94105", "US")
+    candidate = RetrievedCandidate(
+        source1_entity_id="S1-1", candidate_entity_id="S2-1", source="S2", country="US",
+        candidate_name="Acme Trading LLC", candidate_address="12 Market Rd 94105",
+        exact_name_score=100.0, exact_address_score=0.0, name_signature_score=100.0,
+        name_token_score=90.0, address_token_score=80.0, numeric_address_score=70.0,
+        char_name_score=90.0, exact_name_rank=1, exact_address_rank=0,
+        name_signature_rank=1, name_token_rank=2, address_token_rank=3,
+        numeric_address_rank=4, char_name_rank=2, name_idf_overlap=1.0,
+        address_idf_overlap=0.8, name_token_jaccard=1.0, address_token_jaccard=0.6,
+        digit_token_overlap=1.0, char_name_jaccard=1.0, shared_name_tokens=3,
+        shared_address_tokens=3, shared_digit_tokens=2, pass_count=6,
+        best_retrieval_score=120.0, second_best_retrieval_score=100.0,
+    )
+    row = feature_row(source, candidate)
+    assert tuple(row) == FEATURE_NAMES
+    assert len(row) == 83
+    assert row["postal_like_agreement"] == 1.0
+    assert row["secondary_postal_like_agreement"] == 1.0
 
 
 def test_exact_blocker_oracle_includes_singletons():
