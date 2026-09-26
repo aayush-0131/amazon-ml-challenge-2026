@@ -40,6 +40,9 @@ results/exp003*/**/worker.lock
 results/exp003*/**/*.building
 *.f32
 
+# EXP006 samples contain TRAIN S1 identifiers and checkpointed labeled pairs.
+results/exp006*/
+
 # Temporary/cache
 tmp/
 .cache/
