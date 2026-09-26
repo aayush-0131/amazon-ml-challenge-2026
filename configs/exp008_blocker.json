@@ -1,0 +1,7 @@
+{
+  "max_df": 40,
+  "max_added_per_source": 60,
+  "min_name_chars": 4,
+  "min_address_chars": 8,
+  "max_mean_growth": 1.5
+}
