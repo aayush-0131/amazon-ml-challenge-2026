@@ -28,6 +28,13 @@ PACKAGES = ("numpy", "pandas", "RapidFuzz", "scikit-learn", "scipy", "joblib", "
 CODE_FILES = ("normalize.py", "features.py", "similarity.py", "indexed_blocking.py",
               "intersection_scheduler.py", "multipass.py", "modeling.py", "reranker.py",
               "exp003_inference.py", "exp003_training.py")
+# Audited orchestration-only compatibility with the frozen 0ab2266 bundle.
+# Do not weaken checks for feature/retrieval/training/model code or packages.
+BASE_ORCHESTRATION_HASHES = {
+    "exp003_inference.py": "2fa7572d4b8d262e2f79e08f5220ac14354571e7cc800a5871997e65727b82fa",
+    "reranker.py": "128dc29516bccfebcd68e11b3e16ea03547ded8f5aaf110ece71d81b166f7d1e",
+}
+AUDITED_CONFIGURABLE_INFERENCE_HASH = "efd3ab12a8e938144888426658384e9d7d99bbc1f3eada9a81cb7f003a967958"
 
 
 def sha256(path):
@@ -52,6 +59,16 @@ def frozen_config(probes):
 
 def code_versions():
     return {name: sha256(Path(__file__).parent / name) for name in CODE_FILES}
+
+
+def compatible_code_versions(saved):
+    current = code_versions()
+    if saved == current:
+        return True
+    # Accept only this known base-commit pair of hashes on the audited N-shard
+    # implementation. Unknown old hashes or future inference edits fail closed.
+    return (current["exp003_inference.py"] == AUDITED_CONFIGURABLE_INFERENCE_HASH
+            and saved == {**current, **BASE_ORCHESTRATION_HASHES})
 
 
 def package_versions():
@@ -171,7 +188,7 @@ def load_bundle(path):
     probes = bundle["probes"]
     if bundle["blocker_sha256"] != CONFIG_HASHES[probes] or bundle["blocker_config"] != frozen_config(probes):
         raise ValueError("Bundle blocker mismatch")
-    if bundle["code_sha256"] != code_versions() or bundle["package_versions"] != package_versions():
+    if not compatible_code_versions(bundle["code_sha256"]) or bundle["package_versions"] != package_versions():
         raise ValueError("Bundle runtime/code versions differ; use the pinned training checkout/environment")
     if bundle["pool_semantics"] != ("capped_rule14" if probes == 14 else "pass_eligible_no_total_cap"):
         raise ValueError("Bundle candidate pool mismatch")

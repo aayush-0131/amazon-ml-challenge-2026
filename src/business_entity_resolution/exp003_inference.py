@@ -43,12 +43,12 @@ def id_list(values):
 
 def infer_shard(bundle_path, model_mode, test_dir, index_dir, output_dir, *, shard=0, shards=4,
                 smoke_limit=100, allow_full_test=False, checkpoint_every=100):
-    if not 0 <= shard < shards or shards != 4 or checkpoint_every < 1:
-        raise ValueError("Use four shards, shard IDs 0..3 and a positive checkpoint interval")
+    if type(shards) is not int or not 1 <= shards <= 64 or type(shard) is not int or not 0 <= shard < shards or checkpoint_every < 1:
+        raise ValueError("Use 1..64 shards, 0 <= shard < shards and a positive checkpoint interval")
     if smoke_limit is None and not allow_full_test:
         raise ValueError("Full TEST requires --allow-full-test")
-    if smoke_limit is not None and not 0 < smoke_limit <= 1000:
-        raise ValueError("Smoke inference is limited to 1..1000 S1")
+    if smoke_limit is not None and not 0 < smoke_limit <= 4000:
+        raise ValueError("Smoke inference is limited to 1..4000 S1")
     bundle = load_bundle(bundle_path)
     if model_mode not in {"learned", "rule"}:
         raise ValueError("model must be learned or rule")
@@ -127,16 +127,18 @@ def infer_shard(bundle_path, model_mode, test_dir, index_dir, output_dir, *, sha
     return done
 
 
-def merge_shards(shard_dir, test_dir, output_dir, *, allow_full_test=False):
+def merge_shards(shard_dir, test_dir, output_dir, *, shards=4, allow_full_test=False):
     """O(one S1 list) RAM. Disk UNIQUE constraint catches duplicate S1s globally."""
+    if type(shards) is not int or not 1 <= shards <= 64:
+        raise ValueError("Use 1..64 shards")
     shard_dir, test_dir, output_dir = Path(shard_dir), Path(test_dir), Path(output_dir)
     if output_dir.exists():
         raise FileExistsError("Merged output directory must be fresh")
-    manifests = [json.loads((shard_dir / f"shard_{i:02d}/done.json").read_text()) for i in range(4)]
+    manifests = [json.loads((shard_dir / f"shard_{i:02d}/done.json").read_text()) for i in range(shards)]
     keys = ("bundle_sha256", "model", "shards", "smoke_limit", "test_source1", "indexes", "format_version")
     identity = {k: manifests[0][k] for k in keys}
     for i, manifest in enumerate(manifests):
-        if manifest["shard"] != i or manifest["shards"] != 4 or any(manifest[k] != identity[k] for k in keys):
+        if manifest["shard"] != i or manifest["shards"] != shards or any(manifest[k] != identity[k] for k in keys):
             raise ValueError("Mixed/duplicate shard identities")
         if set(manifest["files"]) != {"matching_results.tsv", "candidate_pairs.tsv"}:
             raise ValueError("Incomplete shard file inventory")
@@ -160,7 +162,7 @@ def merge_shards(shard_dir, test_dir, output_dir, *, allow_full_test=False):
             writer.writerow(header)
             writers[name] = writer
             readers[name] = []
-            for i in range(4):
+            for i in range(shards):
                 handle = stack.enter_context((shard_dir / f"shard_{i:02d}" / name).open(encoding="utf-8", newline=""))
                 reader = csv.reader(handle, delimiter="\t")
                 if next(reader, None) != header:
@@ -168,7 +170,7 @@ def merge_shards(shard_dir, test_dir, output_dir, *, allow_full_test=False):
                 readers[name].append(reader)
         counts = Counter()
         for position, record in source_records(test_dir / "test_source1.tsv", identity["smoke_limit"]):
-            shard = position % 4
+            shard = position % shards
             seen.execute("INSERT INTO seen VALUES (?)", (record.entity_id,))
             lists = {}
             for name in writers:
@@ -185,7 +187,7 @@ def merge_shards(shard_dir, test_dir, output_dir, *, allow_full_test=False):
             counts[shard] += 1
         if any(next(reader, None) is not None for group in readers.values() for reader in group):
             raise ValueError("Unexpected extra shard rows")
-        if any(counts[i] != manifests[i]["rows"] for i in range(4)):
+        if any(counts[i] != manifests[i]["rows"] for i in range(shards)):
             raise ValueError("Shard row-count mismatch")
         if fingerprint(test_dir / "test_source1.tsv") != identity["test_source1"]:
             raise ValueError("S1 source changed during merge")

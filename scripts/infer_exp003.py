@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one of four resumable TEST shards, or merge completed shards. No builders."""
+"""Run or merge configurable resumable TEST shards (default four). No builders."""
 import argparse
 from pathlib import Path
 import sys
@@ -18,7 +18,8 @@ def main():
     run.add_argument("--index-dir", type=Path, required=True)
     run.add_argument("--test-dir", type=Path, default=ROOT / "data/raw/test")
     run.add_argument("--output-dir", type=Path, required=True)
-    run.add_argument("--shard", type=int, choices=range(4), required=True)
+    run.add_argument("--shard", type=int, required=True)
+    run.add_argument("--shards", type=int, default=4, help="Deterministic shard count, 1..64 (default: 4)")
     size = run.add_mutually_exclusive_group()
     size.add_argument("--smoke-limit", type=int, default=None)
     size.add_argument("--allow-full-test", action="store_true", help="Explicitly process all TEST S1 instead of the default 100-S1 smoke")
@@ -27,13 +28,14 @@ def main():
     merge.add_argument("--test-dir", type=Path, default=ROOT / "data/raw/test")
     merge.add_argument("--output-dir", type=Path, required=True)
     merge.add_argument("--allow-full-test", action="store_true")
+    merge.add_argument("--shards", type=int, default=4, help="Expected shard count, 1..64 (default: 4)")
     args = parser.parse_args()
     if args.command == "run":
         infer_shard(args.bundle, args.model, args.test_dir, args.index_dir, args.output_dir,
-                    shard=args.shard, smoke_limit=None if args.allow_full_test else (100 if args.smoke_limit is None else args.smoke_limit),
+                    shard=args.shard, shards=args.shards, smoke_limit=None if args.allow_full_test else (100 if args.smoke_limit is None else args.smoke_limit),
                     allow_full_test=args.allow_full_test)
     else:
-        merge_shards(args.shard_dir, args.test_dir, args.output_dir, allow_full_test=args.allow_full_test)
+        merge_shards(args.shard_dir, args.test_dir, args.output_dir, shards=args.shards, allow_full_test=args.allow_full_test)
 
 
 if __name__ == "__main__":
