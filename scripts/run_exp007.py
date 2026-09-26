@@ -10,6 +10,30 @@ sys.path.insert(0, str(ROOT / "src"))
 from business_entity_resolution import exp007
 
 
+class CompatiblePairRow(dict):
+    """Keep DictReader keys while supporting EXP007's positional row consumers."""
+
+    def __getitem__(self, key):
+        if isinstance(key, bool):
+            raise TypeError("Boolean pair-row indexes are invalid")
+        if isinstance(key, int):
+            if not 0 <= key < len(exp007.PAIR_COLUMNS):
+                raise IndexError(f"Pair-row index {key} outside 0..{len(exp007.PAIR_COLUMNS) - 1}")
+            key = exp007.PAIR_COLUMNS[key]
+        return super().__getitem__(key)
+
+
+_original_pair_groups = exp007.pair_groups
+
+
+def compatible_pair_groups(path):
+    for entity_id, rows, matrix in _original_pair_groups(path):
+        yield entity_id, [CompatiblePairRow(row) for row in rows], matrix
+
+
+exp007.pair_groups = compatible_pair_groups
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)

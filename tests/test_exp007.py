@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import csv
 import json
 
 import numpy as np
@@ -13,6 +14,7 @@ from business_entity_resolution.exp007_features import (FEATURE_NAMES, ENHANCED_
 from business_entity_resolution.features import FEATURE_NAMES as OLD_FEATURE_NAMES
 from business_entity_resolution.multipass import RetrievedCandidate
 from business_entity_resolution.sampling import SourceRecord
+from scripts.run_exp007 import compatible_pair_groups
 
 
 @dataclass
@@ -156,3 +158,42 @@ def test_evaluation_pair_generation_requires_frozen_policy():
     with pytest.raises(ValueError, match="Frozen TUNE"):
         exp007.generate("unused", "unused", "unused", "unused", "unused",
                         partition="evaluation", shard=0, shards=1)
+
+
+def test_cli_pair_row_adapter_supports_dict_and_positional_consumers(tmp_path):
+    assert exp007.pair_groups is compatible_pair_groups
+    path = tmp_path / "tune"
+    expected_rows = [
+        ["S1-1", "S2-1", "1", "Acme Trading LLC", "12 Market Road 94105"],
+        ["S1-1", "S3-1", "0", "Acme Trading Ltd", "12 Market Rd 94105"],
+    ]
+    with path.with_suffix(".tsv").open("w", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t")
+        writer.writerow(exp007.PAIR_COLUMNS)
+        writer.writerows(expected_rows)
+    matrix = np.zeros((2, len(FEATURE_NAMES)), dtype=np.float32)
+    matrix.tofile(path.with_suffix(".f32"))
+
+    entity_id, rows, loaded = next(compatible_pair_groups(path))
+    assert entity_id == "S1-1"
+    assert np.array_equal(loaded, matrix)
+    assert len(rows) == 2
+    for row, expected in zip(rows, expected_rows, strict=True):
+        assert tuple(row) == exp007.PAIR_COLUMNS
+        assert [row[index] for index in range(len(exp007.PAIR_COLUMNS))] == expected
+        assert [row[name] for name in exp007.PAIR_COLUMNS] == expected
+        assert row[1] == row["candidate_entity_id"]
+        assert row[2] == row["label"]
+        assert row[3] == row["candidate_name"]
+        assert row[4] == row["candidate_address"]
+    with pytest.raises(IndexError, match="outside 0..4"):
+        _ = rows[0][5]
+    with pytest.raises(IndexError, match="outside 0..4"):
+        _ = rows[0][-1]
+
+    # These consumers previously failed on DictReader rows with integer keys.
+    assert [int(row[2]) for row in rows] == [1, 0]
+    entity, relative, comparisons = exp007.decision_features(rows, loaded, np.asarray([.9, .8]))
+    assert entity[0] == pytest.approx(.9)
+    assert relative.shape == (2, len(exp007.RELATIVE_FEATURE_NAMES))
+    assert comparisons == 1
