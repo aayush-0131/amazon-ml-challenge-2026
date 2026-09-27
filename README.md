@@ -9,6 +9,28 @@ corresponding Source-2 / Source-3 records.
 
 Primary metric: macro F0.5 at Source-1 entity level.
 
+## Round 1 final result
+
+Team **BlackList** submitted **EXP007** as the final Round-1 matcher.
+
+- public leaderboard macro F0.5: **0.916321**
+- untouched EVALUATION macro F0.5: **0.9384071620652703**
+- macro precision: **0.9650289021**
+- macro recall: **0.8835666997**
+- model: scikit-learn HistGradientBoostingClassifier
+- ordered pairwise features: **83**
+- frozen thresholds: **S2 0.965**, **S3 0.956**
+- production commit: `63100d932080e2a783e7dc43eab618abc0d92ad0`
+- archival production branch: `submission/round1-exp007`
+
+The final TEST audit covered 1,732,544 Source-1 entities, 326,418,278
+candidate links and 5,753,590 selected match links. Generated competition
+outputs, raw challenge data, SQLite indexes and large model/pair artifacts remain
+ignored by Git. The verified Round-2 ZIP is preserved outside the repository.
+
+See [EXP007](experiments/EXP007.md) and [Project Status](docs/PROJECT_STATUS.md)
+for the final experiment record.
+
 ## Development principles
 
 1. Competition-provided data only.
@@ -113,8 +135,7 @@ in these entry points:
 git diff --check
 ```
 
-EXP003 is implementation-only pending AWS measurement. Do not submit partial
-smoke outputs. Full TEST requires `--allow-full-test`; nothing uploads to the
-leaderboard automatically. Keep the same pinned environment and committed code
-when training and loading bundles. Generated pair matrices/checkpoints/TSVs are
-ignored; preserve aggregate experiment evidence separately.
+EXP003 is retained as the first learned-reranker baseline. Later EXP006 and
+EXP007 experiments superseded it for Round 1; see the final-result section above.
+Generated pair matrices/checkpoints/TSVs remain ignored; preserve aggregate
+experiment evidence separately.
