@@ -26,10 +26,23 @@ Team **BlackList** submitted **EXP007** as the final Round-1 matcher.
 The final TEST audit covered 1,732,544 Source-1 entities, 326,418,278
 candidate links and 5,753,590 selected match links. Generated competition
 outputs, raw challenge data, SQLite indexes and large model/pair artifacts remain
-ignored by Git. The verified Round-2 ZIP is preserved outside the repository.
+ignored by Git. The original complete archive and the smaller uploaded fallback are preserved outside Git. The fallback omitted the mandatory candidate-pairs TSV because the portal rejected the full package size; technical acceptance remains unknown. Team BlackList does not appear in the published Top 50 list. See the postmortem and evidence register below.
 
 See [EXP007](experiments/EXP007.md) and [Project Status](docs/PROJECT_STATUS.md)
 for the final experiment record.
+
+## Post-submission retrospective (3 October 2026)
+
+**Final status:** EXP007 frozen; code-upload receipt confirmed on 2 October; **not named in the published Top 50**. The public score is not a private leaderboard measurement, and the successful upload does **not** establish approval of the incomplete fallback package. We do not have an organizer-provided explanation for the selection outcome.
+
+Read these documentation artifacts before using this repository as a reference:
+
+- [Full evidence-based postmortem](docs/POSTMORTEM_2026.md): measured bottlenecks, competition outcome, architectural alternatives, uncertainty and failures in the human–AI decision process.
+- [Published Top 50 team audit](docs/TOP50_RESEARCH_2026.md): all 50 IDs/names from the results sheet; a source-backed technical comparison with Androids; **unknown** techniques are explicitly left unknown.
+- [Submission and reproducibility evidence](docs/SUBMISSION_EVIDENCE_2026.md): archive sizes, output hashes, omission disclosure, proof boundary and unfinished manual AWS/evidence checks.
+- [Human-owned competition protocol](docs/FUTURE_COMPETITION_PROTOCOL.md): independent problem reading, architecture review, blocker/decision diagnostics, artifact size budget and delivery gates.
+
+**Data and reproduction boundary:** The private competition inputs, full generated outputs, binary model bundles and indexes are deliberately not published. The frozen code and instructions are inspectable, but **the GitHub repository by itself is not a byte-for-byte runnable reproduction of EXP007**. No post-result competitor technique has been inserted into the frozen submission.
 
 ## Development principles
 
