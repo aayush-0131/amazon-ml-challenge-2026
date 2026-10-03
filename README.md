@@ -37,10 +37,10 @@ for the final experiment record.
 
 Read these documentation artifacts before using this repository as a reference:
 
-- [Full evidence-based postmortem](docs/POSTMORTEM_2026.md): measured bottlenecks, competition outcome, architectural alternatives, uncertainty and failures in the human–AI decision process.
+- [Full evidence-based postmortem](docs/POSTMORTEM_2026.md): measured bottlenecks, technical tradeoffs, competition outcome and unresolved uncertainties.
 - [Published Top 50 team audit](docs/TOP50_RESEARCH_2026.md): all 50 IDs/names from the results sheet; a source-backed technical comparison with Androids; **unknown** techniques are explicitly left unknown.
 - [Submission and reproducibility evidence](docs/SUBMISSION_EVIDENCE_2026.md): archive sizes, output hashes, omission disclosure, proof boundary and unfinished manual AWS/evidence checks.
-- [Human-owned competition protocol](docs/FUTURE_COMPETITION_PROTOCOL.md): independent problem reading, architecture review, blocker/decision diagnostics, artifact size budget and delivery gates.
+- [Public lessons learned](docs/FUTURE_COMPETITION_PROTOCOL.md): concise, generally applicable research and reproducibility principles. Detailed internal planning is maintained separately in private team storage.
 
 **Data and reproduction boundary:** The private competition inputs, full generated outputs, binary model bundles and indexes are deliberately not published. The frozen code and instructions are inspectable, but **the GitHub repository by itself is not a byte-for-byte runnable reproduction of EXP007**. No post-result competitor technique has been inserted into the frozen submission.
 
