@@ -100,7 +100,18 @@ Round-1 submission.
 - generated TEST TSVs and large SQLite/model artifacts are not committed
 - serious experiment claims must map to reproducible committed code and frozen evidence
 
-## Next action
+## Post-submission closeout — 3 October 2026
 
-No additional Round-1 model work is pending. If the team advances, resume from
-the preserved EXP008 branch only after reviewing the Round-2 requirements.
+- Unstop confirmed **Code Submission upload** on 2 October 2026 at approximately 12:48 IST.
+- The full ZIP archive exceeded the portal's 1,024 MB upload limit. The smaller successful fallback upload **omitted mandatory `output/candidate_pairs.tsv`**; this was disclosed. Organizer technical acceptance has **not** been confirmed.
+- Team BlackList is **not in the published Top 50** results shown on 3 October. No private score or organizer-specific explanation is established; do not infer that the missing file alone determined this outcome.
+- EXP007 is frozen and EXP008 remains an unsubmitted diagnostic branch. No post-result modelling changes are authorized.
+- See [postmortem](POSTMORTEM_2026.md), [all Top 50 teams / technical evidence](TOP50_RESEARCH_2026.md), [submission/archive register](SUBMISSION_EVIDENCE_2026.md) and [future competition protocol](FUTURE_COMPETITION_PROTOCOL.md).
+
+## Remaining manual actions
+
+1. Capture fallback archive SHA-256; preserve the two original ZIPs, final screenshots, Unstop receipt and organizer correspondence.
+2. Inspect AWS across Regions and billing; record actual remaining charges rather than assuming resources were shut down.
+3. Follow only official organizer review announcements; do not imply technical acceptance without explicit confirmation.
+4. Complete repository licensing decision separately with the team and third-party dependency licenses before promising that the code is an open-source release.
+
