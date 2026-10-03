@@ -14,8 +14,8 @@
 
 | File | Size | State |
 |---|---:|---|
-| `~/Downloads/BlackList_submission.zip` | 1,971,016,885 bytes | Original complete archive; **not submitted due to portal size limit** |
-| `~/Downloads/BlackList_fallback_reviewed.zip` | 41,553,782 bytes | Uploaded on Unstop, 2 Oct 2026 ~12:48 IST; candidate TSV omitted |
+| `BlackList_submission.zip` | 1,971,016,885 bytes | Original complete archive; **not submitted due to portal size limit** |
+| `BlackList_fallback_reviewed.zip` | 41,553,782 bytes | Uploaded on Unstop, 2 Oct 2026 ~12:48 IST; candidate TSV omitted |
 
 Original complete archive SHA-256 (team-reported and recorded before submission):
 ```text
@@ -28,15 +28,7 @@ matching_results.tsv: 956e80579560c0f8090bec356aae3e849567cf41fe4e0b3079a09ce93a
 candidate_pairs.tsv: b39ac0fc31defc311686fc267dd71631537c6f718844a13543d3c046291e0988
 ```
 
-Fallback ZIP SHA-256 **not yet recorded here**. Run the following *read-only* commands on the Mac after ensuring both archives still exist:
-
-```bash
-shasum -a 256 "$HOME/Downloads/BlackList_submission.zip"
-shasum -a 256 "$HOME/Downloads/BlackList_fallback_reviewed.zip"
-unzip -l "$HOME/Downloads/BlackList_fallback_reviewed.zip" | tail -n 30
-```
-
-Compare the original checksum with the expected value above; save the fallback checksum separately. Do **not** unzip over the working project, recompress, rename, modify or replace the submitted archives.
+The fallback archive SHA-256 has **not yet been independently recorded in this public register**. Maintain original and fallback checksums in the team-controlled private evidence register, and preserve both source archives without modification. Reproducibility or technical acceptance must not be inferred from a checksum alone.
 
 ## Submission details, distinguishing knowns from unknowns
 
@@ -48,7 +40,7 @@ Compare the original checksum with the expected value above; save the fallback c
 
 **Unknown**: whether Amazon technically accepted the incomplete ZIP, independently reproduced EXP007, or disqualified this package; no reviewer response or private evaluation result is established here. **Do not conflate upload success with package compliance**.
 
-**Evidence to retain outside Git**: confirmation email, screenshots of Unstop upload/leaderboard, 1 October support inquiry, archive hash logs, AWS billing export and instance-stop evidence. Do not publish private competition data, credentials, account identifiers or any unrestricted raw TSVs.
+**Evidence to retain privately outside Git**: confirmation email, screenshots of Unstop upload/leaderboard, 1 October support inquiry, archive hash logs, AWS billing export and instance-stop evidence. Do not publish private competition data, credentials, account identifiers or any unrestricted raw TSVs.
 
 ## Reproducibility boundary
 
