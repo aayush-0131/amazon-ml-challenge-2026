@@ -76,27 +76,21 @@ Their public repository **self-reports** a public leaderboard score of 0.991300;
 
 The differences suggest useful *future experiments*, not retrospective proof that cross-encoders, CatBoost, a smaller candidate list, or a country stacker *caused* a particular score increase. Other Top 50 methodologies remain **unverified** unless tied to a team with an attributable code/report source; see [Top 50 research](TOP50_RESEARCH_2026.md).
 
-## 6. Our decision-making failure: AI assistance without enough independent challenge
+## 6. Technical decision-making limitations
 
-This is a **process diagnosis**, not a claim that any person or assistant alone caused the outcome.
+Our project improved its measured public score over successive experiments, but the deployed approach remained one broad model family even after retrieval bottlenecks were measured. We evaluated additional decision strategies as TUNE ablations, yet no such models were promoted to the final deployment. The distinction between engineering an existing approach thoroughly and evaluating fundamentally different architectures deserves emphasis.
 
-- The team adopted an increasingly elaborate version of one broad architecture while its blocker recall and candidate caps remained material.
-- We did not reserve enough early time for genuinely **independent solution families**, e.g. incoming-record competition, cross-encoders, decoy-stress tests and country-specialized routes.
-- We designed ablations, but the deployed system remained a single 83-feature HGB with two source thresholds.
-- The student/team must understand the problem, metric, constraints and outputs themselves. AI advice should generate falsifiable hypotheses and counterarguments, **not serve as the sole decision authority**.
-- The assistant should have insisted on an architecture-diversity review, demanded proof of resource/package compliance, clearly marked architectural assumptions, and surfaced the gap between local EVALUATION and public score without offering causal certainties.
+The resulting lesson is about **independent technical review**: assumptions, evaluation definitions and architectural choices require critical examination by the human team and evidence from experiments. AI-generated recommendations and competitor documentation can assist that process but do not substitute for validation. No individual decision or assistant interaction has been identified as a sole cause of the final result.
 
-The goal is *stronger human ownership*, not refusing useful AI collaboration.
+## 7. Generalizable lessons
 
-## 7. Five changes for the next challenge
+- **Task fidelity:** Understand the official matching semantics, macro metric and unknown test populations before choosing a modeling family.
+- **Component diagnostics:** Audit retrieval coverage separately from classifier and decision performance, particularly for singleton and multi-match entities.
+- **Evidence quality:** Keep exploratory tuning, untouched evaluation, and leaderboard feedback clearly separated.
+- **Deliverable integrity:** Check required files, packaging limits, reproducibility and upload acceptance as independent engineering objectives.
+- **Interpretation:** Publish observed failure modes, but do not claim a specific reason for shortlist exclusion without organizer evidence.
 
-1. **Read the official statement independently:** each teammate writes task semantics, metric, edge cases, restrictions, unseen domains and exact submission contract before prompting a model for approaches.
-2. **Compare at least three candidate solution families early:** cheap lexical baseline; pairwise tabular matcher; ranked-retrieval + semantic reranking (or another genuinely distinct family). Record compute and data requirements; implement only after gates.
-3. **Separate retrieval ceilings from decision quality:** blocker recall, matched-all recall, per-country recall, hard-negative errors, singleton performance, calibration and entity-macro F0.5; hold out an evaluation partition untouched by architecture selection.
-4. **Audit distribution shifts and assumptions:** unseen countries, scripts, legal forms, address shifts, record ownership, multiple matches, decoy clusters and sampling effects.
-5. **Run a delivery rehearsal by the midpoint:** write a realistic full output sample, extrapolate file and ZIP sizes with a safety margin, check validator and packaging, ask organizers about hard limits immediately.
-
-These actions are specified as executable gates in [Future Competition Protocol](FUTURE_COMPETITION_PROTOCOL.md).
+The concise [public lessons note](FUTURE_COMPETITION_PROTOCOL.md) captures these principles without publishing the team's detailed planning playbook.
 
 ## 8. Open questions — do not manufacture answers
 
