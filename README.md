@@ -1,6 +1,6 @@
 # Amazon ML Challenge 2026 — Business Entity Resolution
 
-Competition solution repository for the Business Entity Resolution challenge.
+Team **BlackList** (Aayush Jha and Anish Singh) built a precision-first business entity resolution system for Amazon ML Challenge 2026. This repository documents the frozen Round-1 solution, experiment evidence, and submission limitations.
 
 ## Objective
 
@@ -9,9 +9,21 @@ corresponding Source-2 / Source-3 records.
 
 Primary metric: macro F0.5 at Source-1 entity level.
 
+## Engineering overview
+
+The frozen EXP007 matcher follows an auditable pipeline from entity normalization through candidate generation and entity-level decisions:
+
+1. **Audit and normalize:** inspect supplied business records, standardize names and addresses, and preserve entity-level split boundaries.
+2. **Generate candidates:** use blocking/indexed retrieval to form plausible cross-source pairs without an exhaustive all-pairs join.
+3. **Score matching evidence:** compute **83 ordered pairwise features** and train a scikit-learn **HistGradientBoostingClassifier**.
+4. **Make precision-oriented decisions:** use separately frozen Source-2 and Source-3 score thresholds, with macro F0.5 evaluated at the Source-1 entity level.
+5. **Scale inference and audit output:** process **1,732,544** Source-1 entities and **326,418,278** candidate links, selecting **5,753,590** match links in the final TEST audit.
+
+The model and decision policy are documented in [EXP007](experiments/EXP007.md); the experiment status, splits, and validation evidence are in [Project Status](docs/PROJECT_STATUS.md).
+
 ## Round 1 final result
 
-Team **BlackList** submitted **EXP007** as the final Round-1 matcher.
+The team froze **EXP007** as its final Round-1 matcher. Public leaderboard performance and untouched *local* evaluation performance are different measurements:
 
 - public leaderboard macro F0.5: **0.916321**
 - untouched EVALUATION macro F0.5: **0.9384071620652703**
@@ -23,13 +35,18 @@ Team **BlackList** submitted **EXP007** as the final Round-1 matcher.
 - production commit: `63100d932080e2a783e7dc43eab618abc0d92ad0`
 - archival production branch: `submission/round1-exp007`
 
-The final TEST audit covered 1,732,544 Source-1 entities, 326,418,278
-candidate links and 5,753,590 selected match links. Generated competition
-outputs, raw challenge data, SQLite indexes and large model/pair artifacts remain
-ignored by Git. The original complete archive and the smaller uploaded fallback are preserved outside Git. The fallback omitted the mandatory candidate-pairs TSV because the portal rejected the full package size; technical acceptance remains unknown. Team BlackList does not appear in the published Top 50 list. See the postmortem and evidence register below.
+The numbers above describe the recorded Round-1 experiment, **not** a claim of a private leaderboard result, finalist ranking, or organizer-accepted submission.
 
-See [EXP007](experiments/EXP007.md) and [Project Status](docs/PROJECT_STATUS.md)
-for the final experiment record.
+**Outcome and submission limitations:** Team BlackList did **not** appear in the published Top 50. The complete archive was larger than the upload limit; the uploaded fallback omitted the required candidate-pairs TSV. The upload receipt is confirmed, but organizer technical acceptance is **unknown**. The exact distinction is preserved in the [submission evidence register](docs/SUBMISSION_EVIDENCE_2026.md) and [postmortem](docs/POSTMORTEM_2026.md).
+
+## What can be reviewed
+
+- [EXP007 model, decision policy and experiment commands](experiments/EXP007.md)
+- [Project status, validation results and frozen commit](docs/PROJECT_STATUS.md)
+- [Submission evidence, artifact hashes and limitations](docs/SUBMISSION_EVIDENCE_2026.md)
+- [Postmortem and lessons learned](docs/POSTMORTEM_2026.md)
+
+The repository intentionally excludes raw competition data, large model/pair artifacts, SQLite indexes, and generated TEST outputs. Therefore its code and documentation are **inspectable but not a standalone byte-for-byte reproduction** of the recorded scores; reproduction requires authorized challenge data, the specified environment, and adequate compute.
 
 ## Post-submission retrospective (3 October 2026)
 
