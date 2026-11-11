@@ -1,6 +1,6 @@
 # Amazon ML Challenge 2026 — Business Entity Resolution
 
-Team **BlackList** (Aayush Jha and Anish Singh) built a precision-first business entity resolution system for Amazon ML Challenge 2026. This repository documents the frozen Round-1 solution, experiment evidence, and submission limitations.
+Team **BlackList** (Aayush Jha and Anish Singh) built a precision-first business entity resolution system for Amazon ML Challenge 2026. This repository documents the frozen Round-1 solution and its experiment evidence.
 
 ## Objective
 
@@ -37,29 +37,14 @@ The team froze **EXP007** as its final Round-1 matcher. Public leaderboard perfo
 
 The numbers above describe the recorded Round-1 experiment, **not** a claim of a private leaderboard result, finalist ranking, or organizer-accepted submission.
 
-**Outcome and submission limitations:** Team BlackList did **not** appear in the published Top 50. The complete archive was larger than the upload limit; the uploaded fallback omitted the required candidate-pairs TSV. The upload receipt is confirmed, but organizer technical acceptance is **unknown**. The exact distinction is preserved in the [submission evidence register](docs/SUBMISSION_EVIDENCE_2026.md) and [postmortem](docs/POSTMORTEM_2026.md).
-
 ## What can be reviewed
 
 - [EXP007 model, decision policy and experiment commands](experiments/EXP007.md)
 - [Project status, validation results and frozen commit](docs/PROJECT_STATUS.md)
-- [Submission evidence, artifact hashes and limitations](docs/SUBMISSION_EVIDENCE_2026.md)
-- [Postmortem and lessons learned](docs/POSTMORTEM_2026.md)
 
 The repository intentionally excludes raw competition data, large model/pair artifacts, SQLite indexes, and generated TEST outputs. Therefore its code and documentation are **inspectable but not a standalone byte-for-byte reproduction** of the recorded scores; reproduction requires authorized challenge data, the specified environment, and adequate compute.
 
-## Post-submission retrospective (3 October 2026)
-
-**Final status:** EXP007 frozen; code-upload receipt confirmed on 2 October; **not named in the published Top 50**. The public score is not a private leaderboard measurement, and the successful upload does **not** establish approval of the incomplete fallback package. We do not have an organizer-provided explanation for the selection outcome.
-
-Read these documentation artifacts before using this repository as a reference:
-
-- [Full evidence-based postmortem](docs/POSTMORTEM_2026.md): measured bottlenecks, technical tradeoffs, competition outcome and unresolved uncertainties.
-- [Published Top 50 team audit](docs/TOP50_RESEARCH_2026.md): all 50 IDs/names from the results sheet; a source-backed technical comparison with Androids; **unknown** techniques are explicitly left unknown.
-- [Submission and reproducibility evidence](docs/SUBMISSION_EVIDENCE_2026.md): archive sizes, output hashes, omission disclosure, proof boundary and unfinished manual AWS/evidence checks.
-- [Public lessons learned](docs/FUTURE_COMPETITION_PROTOCOL.md): concise, generally applicable research and reproducibility principles. Detailed internal planning is maintained separately in private team storage.
-
-**Data and reproduction boundary:** The private competition inputs, full generated outputs, binary model bundles and indexes are deliberately not published. The frozen code and instructions are inspectable, but **the GitHub repository by itself is not a byte-for-byte runnable reproduction of EXP007**. No post-result competitor technique has been inserted into the frozen submission.
+**Data and reproduction boundary:** The private competition inputs, full generated outputs, binary model bundles and indexes are deliberately not published. The frozen code and instructions are inspectable, but **the GitHub repository by itself is not a byte-for-byte runnable reproduction of EXP007**.
 
 ## Development principles
 
@@ -85,8 +70,7 @@ data audit
 ## Phase-1 audit and evaluation foundation
 
 Phase 1 provides the dataset audit, ground-truth parsing, entity-level split and
-exact competition metric. Later experiment entry points are documented below;
-full inference always requires explicit authorization.
+exact competition metric. Later experiment entry points are documented below.
 
 The competition dataset must be available through the ignored `data/raw` symlink:
 
